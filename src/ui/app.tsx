@@ -471,7 +471,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([]);
   const [sessionTitle, setSessionTitle] = useState<string | null>(() => agent.getSessionTitle());
   const [sessionId, setSessionId] = useState<string | null>(() => agent.getSessionId());
-  const [sessionRecap, setSessionRecap] = useState<string | null>(() => agent.getSessionRecap());
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [providerStep, setProviderStep] = useState<
@@ -770,7 +769,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       }
       setRecapsEnabledState(enabled);
       saveRecapsEnabled(enabled);
-      setSessionRecap(agent.getSessionRecap());
     },
     [agent],
   );
@@ -1392,7 +1390,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           });
           setSessionTitle(activeTurn.agent.getSessionTitle());
           setSessionId(activeTurn.agent.getSessionId());
-          setSessionRecap(activeTurn.agent.getSessionRecap());
         } else if (activeTurn.kind === "telegram") {
           syncTelegramTurnEntries(activeTurn);
         }
@@ -2062,7 +2059,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     clearLiveTurnUi();
     setSessionTitle(snapshot?.session.title ?? null);
     setSessionId(snapshot?.session.id ?? agent.getSessionId());
-    setSessionRecap(agent.getSessionRecap());
     setActivePlan(null);
     setPqs(initialPlanQuestionsState());
     replacePasteBlocks([]);
@@ -3511,7 +3507,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             {btwState && <BtwOverlay state={btwState} theme={t} />}
             {/* Prompt */}
             <box flexShrink={0} flexDirection="column">
-              {sessionRecap ? <RecapBanner t={t} recap={sessionRecap} /> : null}
               <PromptBox
                 t={t}
                 inputRef={inputRef}
@@ -3793,17 +3788,6 @@ function SessionHeader({
         <box flexGrow={1} />
         {sessionId ? <text fg={t.textDim}>{sessionId}</text> : null}
       </box>
-    </box>
-  );
-}
-
-function RecapBanner({ t, recap }: { t: Theme; recap: string }) {
-  return (
-    <box width="100%" paddingBottom={1}>
-      <text>
-        <span style={{ fg: t.textDim }}>{"※ recap: "}</span>
-        <span style={{ fg: t.textMuted }}>{recap}</span>
-      </text>
     </box>
   );
 }
