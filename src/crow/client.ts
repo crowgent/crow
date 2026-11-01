@@ -4,7 +4,7 @@ import { generateText } from "ai";
 import { getModelInfo, normalizeModelId, type ProviderModelInfo } from "./models";
 
 export type CrowProvider = ReturnType<typeof createOpenAI>;
-export type CrowRuntimeModel = ReturnType<CrowProvider>;
+export type CrowRuntimeModel = ReturnType<CrowProvider["chat"]>;
 
 interface GeneratedTextResult {
   modelId: string;
@@ -41,7 +41,7 @@ export function resolveModelRuntime(provider: CrowProvider, requestedModelId: st
   const modelId = normalizeModelId(requestedModelId);
   const modelInfo = getModelInfo(modelId);
   return {
-    model: provider(modelId),
+    model: provider.chat(modelId),
     modelId,
     modelInfo,
     providerOptions: undefined,

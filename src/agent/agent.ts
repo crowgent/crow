@@ -2765,6 +2765,9 @@ function humanizeApiError(error: unknown): string {
     const detail = extractResponseDetail(error.responseBody);
     if (detail) return detail;
     if (error.statusCode && STATUS_MESSAGES[error.statusCode]) {
+      if (error.statusCode === 404 && error.url) {
+        return `${STATUS_MESSAGES[error.statusCode]} (tried ${error.url})`;
+      }
       return STATUS_MESSAGES[error.statusCode];
     }
   }
