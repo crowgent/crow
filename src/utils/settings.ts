@@ -136,7 +136,6 @@ export interface UserSettings {
   apiKey?: string;
   defaultModel?: string;
   providerId?: string;
-  providerApiKeys?: Record<string, string>;
   providerModels?: Record<string, string>;
   customProviders?: CustomProvider[];
   recapsEnabled?: boolean;
@@ -160,6 +159,53 @@ export interface ProjectSettings {
 
 const USER_DIR = path.join(os.homedir(), ".crow");
 const USER_SETTINGS_PATH = path.join(USER_DIR, "user-settings.json");
+const AUTH_PATH = path.join(USER_DIR, "auth.json");
+
+interface AuthKeyEntry {
+  type: "api";
+  key: string;
+}
+
+type AuthFile = Record<string, AuthKeyEntry>;
+
+let legacyKeysMigrated = false;
+
+function loadAuthFile(): AuthFile {
+  const raw = readJson<unknown>(AUTH_PATH);
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return {};
+  const out: AuthFile = {};
+  for (const [providerId, entry] of Object.entries(raw)) {
+    if (
+      typeof entry === "object" &&
+      entry !== null &&
+      (entry as AuthKeyEntry).type === "api" &&
+      typeof (entry as AuthKeyEntry).key === "string"
+    ) {
+      out[providerId] = { type: "api", key: (entry as AuthKeyEntry).key };
+    }
+  }
+  return out;
+}
+
+function migrateLegacyProviderKeys(): void {
+  if (legacyKeysMigrated) return;
+  legacyKeysMigrated = true;
+  const raw = readJson<Record<string, unknown>>(USER_SETTINGS_PATH);
+  const legacy = raw?.providerApiKeys;
+  if (typeof legacy !== "object" || legacy === null || Array.isArray(legacy)) return;
+  const auth = loadAuthFile();
+  let changed = false;
+  for (const [providerId, key] of Object.entries(legacy)) {
+    if (typeof key !== "string") continue;
+    if (auth[providerId]) continue;
+    auth[providerId] = { type: "api", key };
+    changed = true;
+  }
+  if (changed) writeJson(AUTH_PATH, auth);
+  const cleaned = { ...raw };
+  delete cleaned.providerApiKeys;
+  writeJson(USER_SETTINGS_PATH, cleaned);
+}
 
 function ensureDir(dir: string): void {
   if (!fs.existsSync(dir)) {
@@ -193,9 +239,6 @@ export function saveUserSettings(partial: Partial<UserSettings>): void {
     ...(partial.apiKey !== undefined ? { apiKey: partial.apiKey } : {}),
     ...(partial.defaultModel !== undefined ? { defaultModel: normalizeModelId(partial.defaultModel) } : {}),
     ...(partial.providerId !== undefined ? { providerId: partial.providerId } : {}),
-    ...(partial.providerApiKeys !== undefined
-      ? { providerApiKeys: { ...current.providerApiKeys, ...partial.providerApiKeys } }
-      : {}),
     ...(partial.providerModels !== undefined
       ? { providerModels: { ...current.providerModels, ...partial.providerModels } }
       : {}),
@@ -291,14 +334,17 @@ export function getSelectedProviderId(): string | undefined {
 }
 
 export function getProviderApiKey(providerId: string): string | undefined {
-  const saved = loadUserSettings().providerApiKeys?.[providerId]?.trim();
+  migrateLegacyProviderKeys();
+  const saved = loadAuthFile()[providerId]?.key.trim();
   if (saved) return saved;
   return getProviderApiKeyFromEnv(providerId);
 }
 
 export function saveProviderApiKey(providerId: string, apiKey: string): void {
-  const current = loadUserSettings().providerApiKeys ?? {};
-  saveUserSettings({ providerApiKeys: { ...current, [providerId]: apiKey } });
+  migrateLegacyProviderKeys();
+  const auth = loadAuthFile();
+  auth[providerId] = { type: "api", key: apiKey };
+  writeJson(AUTH_PATH, auth);
 }
 
 export interface SelectedProvider {
