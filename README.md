@@ -128,7 +128,7 @@ Environment variables:
 | `CROW_MODEL` | Model id override |
 | `CROW_MAX_TOKENS` | Max tokens override |
 
-See `.env.example` for the per-provider key variables.
+Each provider's key variable is listed in the provider table above.
 
 ## TUI commands
 

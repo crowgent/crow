@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { InvalidArgumentError, program } from "commander";
-import * as dotenv from "dotenv";
 import readline from "readline";
 import packageJson from "../package.json";
 import { Agent } from "./agent/agent";
@@ -40,8 +39,6 @@ import {
   saveWorkspaceTrustDecision,
 } from "./utils/workspace-trust";
 import { buildVerifyPrompt, getVerifyCliError } from "./verify/entrypoint";
-
-dotenv.config();
 
 const exitCleanlyOnSigterm = () => {
   process.exit(0);
