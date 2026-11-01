@@ -440,7 +440,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [hasApiKey, setHasApiKey] = useState(initialHasApiKey);
   const [messages, setMessages] = useState<ChatEntry[]>(() => agent.getChatEntries());
   const [streamContent, setStreamContent] = useState("");
-  const [_streamReasoning, setStreamReasoning] = useState("");
+  const [streamReasoning, setStreamReasoning] = useState("");
+  const [thoughtSummary, setThoughtSummary] = useState<{ durationMs: number; preview: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [liveTurnSourceLabel, setLiveTurnSourceLabel] = useState<string | null>(null);
   const [model, setModel] = useState(agent.getModel());
@@ -536,6 +537,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const processedInitial = useRef(false);
   const contentAccRef = useRef("");
   const startTimeRef = useRef(0);
+  const thoughtDoneRef = useRef(false);
+  const reasoningAccRef = useRef("");
   const isProcessingRef = useRef(false);
   const hasApiKeyRef = useRef(initialHasApiKey);
   const showProviderModalRef = useRef(false);
@@ -1219,6 +1222,9 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const clearLiveTurnUi = useCallback(() => {
     setStreamContent("");
     setStreamReasoning("");
+    setThoughtSummary(null);
+    thoughtDoneRef.current = false;
+    reasoningAccRef.current = "";
     setActiveToolCalls([]);
     setActiveSubagent(null);
     setLiveTurnSourceLabel(null);
@@ -1253,6 +1259,16 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     },
     [clearLiveTurnUi],
   );
+
+  const markThinkingDone = useCallback(() => {
+    if (thoughtDoneRef.current) return;
+    thoughtDoneRef.current = true;
+    const startedAt = startTimeRef.current;
+    setThoughtSummary({
+      durationMs: startedAt > 0 ? Date.now() - startedAt : 0,
+      preview: thoughtPreview(reasoningAccRef.current),
+    });
+  }, []);
 
   const flushPendingAssistantMessage = useCallback(() => {
     const activeTurn = activeTurnRef.current;
@@ -2094,17 +2110,21 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
             switch (chunk.type) {
               case "content":
+                markThinkingDone();
                 applyLocalAssistantDelta(chunk.content || "");
                 break;
               case "reasoning":
+                reasoningAccRef.current += chunk.content || "";
                 setStreamReasoning((p) => p + (chunk.content || ""));
                 break;
               case "tool_calls":
+                markThinkingDone();
                 if (chunk.toolCalls) {
                   showLiveToolCalls(chunk.toolCalls);
                 }
                 break;
               case "tool_result":
+                markThinkingDone();
                 if (chunk.toolCall && chunk.toolResult) {
                   appendLiveToolResult(chunk.toolCall, chunk.toolResult);
                 }
@@ -2133,6 +2153,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 }
                 break;
               case "error":
+                markThinkingDone();
                 turnHadError = true;
                 if (chunk.isAuthError) {
                   turnHadAuthError = true;
@@ -2141,6 +2162,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 setStreamContent(contentAccRef.current);
                 break;
               case "done":
+                markThinkingDone();
                 break;
             }
           }
@@ -2178,6 +2200,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       applyLocalAssistantDelta,
       beginLiveTurn,
       finalizeActiveTurn,
+      markThinkingDone,
       scrollToBottom,
       sessionTitle,
       showLiveToolCalls,
@@ -3465,6 +3488,14 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                   <text fg={t.textMuted}>{liveTurnSourceLabel}</text>
                 </box>
               )}
+              {thoughtSummary && (
+                <box paddingLeft={3} marginTop={1} flexShrink={0}>
+                  <text fg={t.textMuted}>
+                    Thought{thoughtSummary.preview ? `: ${thoughtSummary.preview}` : ""} ·{" "}
+                    {formatThoughtDuration(thoughtSummary.durationMs)}
+                  </text>
+                </box>
+              )}
               {/* Active tool calls — pending inline */}
               {activeToolCalls.map((tc) =>
                 tc.function.name === "task" ? (
@@ -3497,8 +3528,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 </box>
               )}
               {/* Waiting indicator */}
-              {isProcessing && !streamContent && activeToolCalls.length === 0 && (
-                <ShimmerText t={t} text="Planning next moves" />
+              {isProcessing && thoughtSummary == null && !streamContent && activeToolCalls.length === 0 && (
+                <ThinkingSpinner
+                  t={t}
+                  label={streamReasoning ? `Thinking: ${thoughtPreview(streamReasoning)}` : "Thinking"}
+                />
               )}
               {/* Plan questions panel — inline, OpenCode-style */}
               {showPlanPanel && <PlanQuestionsPanel t={t} questions={planQuestions} state={pqs} />}
@@ -4642,12 +4676,33 @@ function formatLspSeverity(severity?: number): string {
   }
 }
 
-function ShimmerText({ t, text }: { t: Theme; text: string }) {
+const THINKING_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function thoughtPreview(text: string): string {
+  const first = text.split("\n").find((line) => line.trim().length > 0) ?? "";
+  const trimmed = first.trim();
+  return trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed;
+}
+
+function formatThoughtDuration(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
+function ThinkingSpinner({ t, label }: { t: Theme; label: string }) {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => (f + 1) % THINKING_FRAMES.length), 80);
+    return () => clearInterval(id);
+  }, []);
   return (
     <box paddingLeft={3}>
       <text>
-        <span style={{ fg: t.textMuted }}>{"○"}</span>
-        <span style={{ fg: t.textMuted }}> {text}</span>
+        <span style={{ fg: t.textMuted }}>{THINKING_FRAMES[frame]}</span>
+        <span style={{ fg: t.textMuted }}> {label}</span>
       </text>
     </box>
   );
