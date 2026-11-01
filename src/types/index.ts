@@ -199,6 +199,10 @@ export interface ChatEntry {
   toolCalls?: ToolCall[];
   toolCall?: ToolCall;
   toolResult?: ToolResult;
+  thought?: {
+    durationMs: number;
+    text: string;
+  };
 }
 
 export interface PaymentPrecheck {

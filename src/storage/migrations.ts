@@ -142,6 +142,16 @@ function createSessionRecapSchema(db: SQLiteDatabase): void {
 
 function ensureLatestSchema(db: SQLiteDatabase): void {
   createSessionRecapSchema(db);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS thoughts (
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      message_seq INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      text TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (session_id, message_seq)
+    ) STRICT;
+  `);
 }
 
 function addColumnIfMissing(db: SQLiteDatabase, table: string, column: string, definition: string): void {

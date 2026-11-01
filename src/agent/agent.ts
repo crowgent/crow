@@ -16,6 +16,7 @@ import {
 import {
   type CrowProvider,
   createProvider,
+  createReasoningCapture,
   generateRecap as genRecap,
   generateTitle as genTitle,
   resolveModelRuntime,
@@ -49,6 +50,7 @@ import {
   getSessionTotalTokens,
   loadTranscript,
   loadTranscriptState,
+  recordThought,
   recordUsageEvent,
   SessionStore,
 } from "../storage/index";
@@ -1790,7 +1792,11 @@ export class Agent {
     }
   }
 
-  private appendCompletedTurn(userMessage: ModelMessage, newMessages: ModelMessage[]): void {
+  private appendCompletedTurn(
+    userMessage: ModelMessage,
+    newMessages: ModelMessage[],
+    thought?: { durationMs: number; text: string },
+  ): void {
     if (newMessages.length === 0) return;
 
     const userIndex = this.messages.lastIndexOf(userMessage);
@@ -1809,6 +1815,13 @@ export class Agent {
     }
     this.messages.push(...newMessages);
     this.messageSeqs.push(...insertedSeqs.slice(1));
+    if (thought != null) {
+      const firstAssistantIndex = newMessages.findIndex((message) => message.role === "assistant");
+      const firstAssistantSeq = firstAssistantIndex >= 0 ? insertedSeqs[1 + firstAssistantIndex] : undefined;
+      if (firstAssistantSeq != null) {
+        recordThought(this.session.id, firstAssistantSeq, thought.durationMs, thought.text);
+      }
+    }
     this.sessionStore.touchSession(this.session.id, this.bash.getCwd());
     this.session = this.sessionStore.getRequiredSession(this.session.id);
   }
@@ -1854,7 +1867,13 @@ export class Agent {
     this.messages.push(userModelMessage);
     this.messageSeqs.push(null);
 
-    const provider = this.requireProvider();
+    this.requireProvider();
+    let capturedReasoning = "";
+    let capturedReasoningEmitted = 0;
+    const reasoningCapture = createReasoningCapture((text) => {
+      capturedReasoning += text;
+    });
+    const provider = createProvider(this.apiKey ?? "", this.baseURL ?? undefined, reasoningCapture.fetch);
     const subagents = loadValidSubAgents();
     const system = applyModelConstraints(
       buildSystemPrompt(
@@ -1871,6 +1890,8 @@ export class Agent {
     const modelInfo = runtime.modelInfo;
     this.planContext = null;
     let attemptedOverflowRecovery = false;
+    let thinkStartMs = 0;
+    let thinkDoneMs: number | null = null;
 
     if (this.batchApi) {
       try {
@@ -1940,6 +1961,19 @@ export class Agent {
             }
           }
 
+          const emitReasoning = function* (text: string): Generator<StreamChunk> {
+            reasoningPreview = `${reasoningPreview}${text}`.slice(-256);
+            if (containsEncryptedReasoning(reasoningPreview)) {
+              if (!encryptedReasoningHidden) {
+                encryptedReasoningHidden = true;
+                yield { type: "reasoning", content: "[Encrypted reasoning hidden]" };
+              }
+              return;
+            }
+            yield { type: "reasoning", content: text };
+          };
+
+          if (thinkStartMs === 0) thinkStartMs = Date.now();
           const result = streamText({
             model: runtime.model,
             system,
@@ -1979,6 +2013,22 @@ export class Agent {
               break;
             }
 
+            if (
+              thinkDoneMs == null &&
+              (part.type === "text-delta" ||
+                part.type === "tool-call" ||
+                part.type === "tool-result" ||
+                part.type === "error")
+            ) {
+              thinkDoneMs = Date.now();
+            }
+
+            if (capturedReasoningEmitted < capturedReasoning.length) {
+              const fresh = capturedReasoning.slice(capturedReasoningEmitted);
+              capturedReasoningEmitted = capturedReasoning.length;
+              yield* emitReasoning(fresh);
+            }
+
             switch (part.type) {
               case "text-delta":
                 assistantText += part.text;
@@ -1986,15 +2036,7 @@ export class Agent {
                 break;
 
               case "reasoning-delta":
-                reasoningPreview = `${reasoningPreview}${part.text}`.slice(-256);
-                if (containsEncryptedReasoning(reasoningPreview)) {
-                  if (!encryptedReasoningHidden) {
-                    encryptedReasoningHidden = true;
-                    yield { type: "reasoning", content: "[Encrypted reasoning hidden]" };
-                  }
-                  break;
-                }
-                yield { type: "reasoning", content: part.text };
+                yield* emitReasoning(part.text);
                 break;
 
               case "tool-call": {
@@ -2075,10 +2117,14 @@ export class Agent {
             return;
           }
 
+          await reasoningCapture.settled();
+          const thinkDurationMs = thinkStartMs > 0 ? (thinkDoneMs ?? Date.now()) - thinkStartMs : undefined;
+          const thought =
+            thinkDurationMs == null ? undefined : { durationMs: thinkDurationMs, text: capturedReasoning.trim() };
           try {
             const response = await result.response;
             if (!signal.aborted) {
-              this.appendCompletedTurn(userModelMessage, sanitizeModelMessages(response.messages));
+              this.appendCompletedTurn(userModelMessage, sanitizeModelMessages(response.messages), thought);
               await this.refreshSessionRecap(signal);
               streamOk = true;
             }
@@ -2101,7 +2147,7 @@ export class Agent {
           }
 
           if (!streamOk && assistantText.trim()) {
-            this.appendCompletedTurn(userModelMessage, [{ role: "assistant", content: assistantText }]);
+            this.appendCompletedTurn(userModelMessage, [{ role: "assistant", content: assistantText }], thought);
             await this.refreshSessionRecap(signal);
           }
 

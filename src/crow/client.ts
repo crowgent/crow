@@ -30,11 +30,83 @@ export interface ResolvedModelRuntime {
   providerOptions?: SharedV3ProviderOptions;
 }
 
-export function createProvider(apiKey: string, baseURL?: string): CrowProvider {
+export function createProvider(apiKey: string, baseURL?: string, fetchOverride?: typeof fetch): CrowProvider {
   return createOpenAI({
     apiKey,
     baseURL: baseURL || undefined,
+    ...(fetchOverride ? { fetch: fetchOverride } : {}),
   });
+}
+
+export interface ReasoningCapture {
+  fetch: typeof fetch;
+  settled: () => Promise<void>;
+}
+
+export function createReasoningCapture(onReasoning: (text: string) => void): ReasoningCapture {
+  let pending: Promise<void> = Promise.resolve();
+  const fetchWithCapture: typeof fetch = async (input, init) => {
+    const response = await fetch(input, init);
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!response.body || !contentType.includes("text/event-stream")) return response;
+    const [sdkBranch, parseBranch] = response.body.tee();
+    pending = consumeReasoningStream(parseBranch, onReasoning).then(
+      () => undefined,
+      () => undefined,
+    );
+    return new Response(sdkBranch, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  };
+  return {
+    fetch: fetchWithCapture,
+    settled: () => Promise.race([pending, new Promise<void>((resolve) => setTimeout(resolve, 2000))]),
+  };
+}
+
+async function consumeReasoningStream(
+  stream: ReadableStream<Uint8Array>,
+  onReasoning: (text: string) => void,
+): Promise<void> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let split = buffer.indexOf("\n\n");
+      while (split >= 0) {
+        const event = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        for (const line of event.split("\n")) {
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === "[DONE]") continue;
+          let parsed: {
+            choices?: Array<{ delta?: { reasoning_content?: unknown; reasoning?: unknown } }>;
+          } | null = null;
+          try {
+            parsed = JSON.parse(data) as {
+              choices?: Array<{ delta?: { reasoning_content?: unknown; reasoning?: unknown } }>;
+            };
+          } catch {
+            parsed = null;
+          }
+          if (!parsed) continue;
+          const delta = parsed.choices?.[0]?.delta;
+          const text = delta?.reasoning_content ?? delta?.reasoning;
+          if (typeof text === "string" && text) onReasoning(text);
+        }
+        split = buffer.indexOf("\n\n");
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export function resolveModelRuntime(provider: CrowProvider, requestedModelId: string): ResolvedModelRuntime {

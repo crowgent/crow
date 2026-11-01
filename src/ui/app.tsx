@@ -3490,10 +3490,12 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               )}
               {thoughtSummary && (
                 <box paddingLeft={3} marginTop={1} flexShrink={0}>
-                  <text fg={t.textMuted}>
-                    Thought{thoughtSummary.preview ? `: ${thoughtSummary.preview}` : ""} ·{" "}
-                    {formatThoughtDuration(thoughtSummary.durationMs)}
-                  </text>
+                  <ThoughtLine
+                    t={t}
+                    durationMs={thoughtSummary.durationMs}
+                    preview={thoughtSummary.preview}
+                    fullText={streamReasoning}
+                  />
                 </box>
               )}
               {/* Active tool calls — pending inline */}
@@ -4336,6 +4338,14 @@ function MessageView({
       return (
         <box paddingLeft={3} marginTop={1} flexShrink={0} flexDirection="column">
           {entry.sourceLabel ? <text fg={t.textMuted}>{entry.sourceLabel}</text> : null}
+          {entry.thought ? (
+            <ThoughtLine
+              t={t}
+              durationMs={entry.thought.durationMs}
+              preview={thoughtPreview(entry.thought.text)}
+              fullText={entry.thought.text}
+            />
+          ) : null}
           <Markdown content={entry.content} t={t} />
         </box>
       );
@@ -4690,6 +4700,37 @@ function formatThoughtDuration(ms: number): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
+}
+
+function ThoughtLine({
+  t,
+  durationMs,
+  preview,
+  fullText,
+}: {
+  t: Theme;
+  durationMs: number;
+  preview: string;
+  fullText: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const expandable = fullText.trim().length > 0;
+  return (
+    <box flexDirection="column" flexShrink={0}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: click toggles the expanded thinking text */}
+      <box flexShrink={0} onMouseUp={expandable ? () => setExpanded((value) => !value) : undefined}>
+        <text fg={t.textMuted}>
+          Thought{preview ? `: ${preview}` : ""} · {formatThoughtDuration(durationMs)}
+          {expandable ? (expanded ? " ▾" : " ▸") : ""}
+        </text>
+      </box>
+      {expanded && (
+        <box flexShrink={0}>
+          <text fg={t.textMuted}>{fullText}</text>
+        </box>
+      )}
+    </box>
+  );
 }
 
 function ThinkingSpinner({ t, label }: { t: Theme; label: string }) {

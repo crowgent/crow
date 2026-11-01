@@ -222,13 +222,47 @@ export function appendCompaction(sessionId: string, firstKeptSeq: number, summar
   });
 }
 
+export function recordThought(sessionId: string, messageSeq: number, durationMs: number, text = ""): void {
+  getDatabase()
+    .prepare(`
+      INSERT INTO thoughts (session_id, message_seq, duration_ms, text, created_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(session_id, message_seq) DO UPDATE SET duration_ms = excluded.duration_ms, text = excluded.text
+    `)
+    .run(sessionId, messageSeq, Math.max(0, Math.round(durationMs)), text, new Date().toISOString());
+}
+
+function loadThoughtDurations(sessionId: string): Map<number, { durationMs: number; text: string }> {
+  const rows = getDatabase()
+    .prepare(`
+      SELECT message_seq, duration_ms, text
+      FROM thoughts
+      WHERE session_id = ?
+    `)
+    .all(sessionId) as Array<{ message_seq: number; duration_ms: number; text: string | null }>;
+  return new Map(rows.map((row) => [row.message_seq, { durationMs: row.duration_ms, text: row.text ?? "" }]));
+}
+
+function extractReasoningText(content: ModelMessage["content"]): string {
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const part of content) {
+    if (!part || typeof part !== "object" || part.type !== "reasoning") continue;
+    const record = part as { text?: unknown; reasoning?: unknown };
+    if (typeof record.text === "string" && record.text) parts.push(record.text);
+    else if (typeof record.reasoning === "string" && record.reasoning) parts.push(record.reasoning);
+  }
+  return parts.join("").trim();
+}
+
 export function buildChatEntries(sessionId: string): ChatEntry[] {
   const toolResults = loadStoredToolResults(sessionId);
+  const thoughtDurations = loadThoughtDurations(sessionId);
   const callMap = new Map<string, ToolCall>();
   const entries: ChatEntry[] = [];
 
   for (const row of buildEffectiveMessageRecords(sessionId)) {
-    const { message, timestamp } = row;
+    const { message, seq, timestamp } = row;
 
     if (message.role === "user") {
       const content = renderUserContent(message.content);
@@ -250,7 +284,15 @@ export function buildChatEntries(sessionId: string): ChatEntry[] {
     if (message.role === "assistant") {
       const text = renderAssistantContent(message.content, callMap);
       if (text) {
-        entries.push({ type: "assistant", content: text, timestamp });
+        const thoughtRow = seq == null ? undefined : thoughtDurations.get(seq);
+        const entry: ChatEntry = { type: "assistant", content: text, timestamp };
+        if (thoughtRow != null) {
+          entry.thought = {
+            durationMs: thoughtRow.durationMs,
+            text: thoughtRow.text || extractReasoningText(message.content),
+          };
+        }
+        entries.push(entry);
       }
       continue;
     }
