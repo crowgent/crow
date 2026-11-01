@@ -3085,11 +3085,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           return;
         }
         if (key.name === "up") {
-          setAgentsModalIndex((index) => Math.max(0, index - 1));
+          setAgentsModalIndex((index) => wrapListIndex(index, agentRows.length, -1));
           return;
         }
         if (key.name === "down") {
-          setAgentsModalIndex((index) => Math.min(Math.max(0, agentRows.length - 1), index + 1));
+          setAgentsModalIndex((index) => wrapListIndex(index, agentRows.length, 1));
           return;
         }
         if (key.name === "return") {
@@ -3163,11 +3163,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         if (providerStep === "list") {
           if (key.name === "up") {
-            setProviderIndex((i) => Math.max(0, i - 1));
+            setProviderIndex((i) => wrapListIndex(i, providerRows.length + 1, -1));
             return;
           }
           if (key.name === "down") {
-            setProviderIndex((i) => Math.min(providerRows.length, i + 1));
+            setProviderIndex((i) => wrapListIndex(i, providerRows.length + 1, 1));
             return;
           }
           if (key.name === "return") {
@@ -3178,11 +3178,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         if (providerStep === "customModelList") {
           if (key.name === "up") {
-            setProviderIndex((i) => Math.max(0, i - 1));
+            setProviderIndex((i) => wrapListIndex(i, customFetchedModels.length, -1));
             return;
           }
           if (key.name === "down") {
-            setProviderIndex((i) => Math.min(customFetchedModels.length - 1, i + 1));
+            setProviderIndex((i) => wrapListIndex(i, customFetchedModels.length, 1));
             return;
           }
           if (key.name === "return") {
@@ -3754,6 +3754,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showSlashMenu={showSlashMenu}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
+                showAgentsModal={showAgentsModal}
+                showAgentsEditor={showAgentsEditor}
                 blockPrompt={blockPrompt}
                 onSubmit={handleSubmit}
                 onPaste={handlePaste}
@@ -3793,6 +3795,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showSlashMenu={showSlashMenu}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
+                showAgentsModal={showAgentsModal}
+                showAgentsEditor={showAgentsEditor}
                 blockPrompt={blockPrompt}
                 onSubmit={handleSubmit}
                 onPaste={handlePaste}
@@ -4071,6 +4075,8 @@ function PromptBox({
   showSlashMenu,
   showPlanQuestions,
   showProviderModal,
+  showAgentsModal,
+  showAgentsEditor,
   blockPrompt,
   onSubmit,
   onPaste,
@@ -4092,6 +4098,8 @@ function PromptBox({
   showSlashMenu: boolean;
   showPlanQuestions: boolean;
   showProviderModal: boolean;
+  showAgentsModal: boolean;
+  showAgentsEditor: boolean;
   blockPrompt?: boolean;
   onSubmit: () => void;
   onPaste: (event: PasteEvent) => void;
@@ -4164,6 +4172,8 @@ function PromptBox({
                 !showSlashMenu &&
                 !showPlanQuestions &&
                 !showProviderModal &&
+                !showAgentsModal &&
+                !showAgentsEditor &&
                 !blockPrompt
               }
               placeholder={isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Crow..."}
@@ -6018,6 +6028,11 @@ function isEscapeKey(key: KeyEvent): boolean {
     key.sequence === "\u001b" ||
     key.raw === "\u001b"
   );
+}
+
+function wrapListIndex(index: number, count: number, delta: number): number {
+  if (count <= 0) return 0;
+  return (index + delta + count) % count;
 }
 
 function toolArgs(tc?: ToolCall): string {
