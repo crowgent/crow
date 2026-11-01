@@ -1,0 +1,73 @@
+---
+description: Project overview and architecture reference
+globs: "**/*"
+alwaysApply: true
+---
+
+# Crow — Project Overview
+
+Crow is an open-source AI coding agent that brings AI assistance directly into the terminal. It works with any OpenAI-compatible provider: 206 built-in providers plus a custom provider wizard for any other endpoint.
+
+## Tech Stack
+
+- **Language**: TypeScript (ES2022, ESNext modules)
+- **Runtime**: Bun (primary)
+- **UI Framework**: React with [OpenTUI](https://github.com/anomalyco/opentui) for terminal rendering
+- **Build**: `tsc` (TypeScript compiler)
+- **Package Manager**: Bun
+- **Model layer**: Vercel AI SDK (`ai` + `@ai-sdk/openai`, Chat Completions only)
+- **Storage**: `bun:sqlite` (sessions, transcripts, thoughts)
+- **Tools**: File, bash, grep, computer control, MCP servers, LSP, subagents
+
+## Architecture
+
+```
+src/
+├── index.ts          # CLI entry point (Commander.js + OpenTUI)
+├── agent/
+│   ├── agent.ts      # Agent coordinator, session management, subagent routing
+│   ├── delegations.ts # Background delegations (explore-only)
+│   ├── reasoning.ts  # Reasoning handling, encrypted-reasoning filtering
+│   └── compaction.ts # Conversation compaction
+├── crow/
+│   ├── client.ts     # Provider runtime (createOpenAI, reasoning capture)
+│   ├── models.ts     # Model definitions and metadata
+│   └── tools.ts      # Tool schemas (bash, read, grep, task, delegate, computer)
+├── tools/
+│   ├── bash.ts       # Bash command execution
+│   ├── file.ts       # File read/edit
+│   ├── grep.ts       # Ripgrep-backed search
+│   └── computer.ts   # Desktop screenshot/input tools
+├── ui/
+│   ├── app.tsx       # OpenTUI React terminal UI
+│   └── agents-modal.tsx # Sub-agent browser and editor
+├── utils/
+│   ├── settings.ts   # User and project settings
+│   ├── providers.ts  # Built-in provider catalog and live model fetch
+│   ├── agent-files.ts # Markdown sub-agent registry (.crow/agents)
+│   └── skills.ts     # Skill discovery
+├── storage/          # SQLite transcript, sessions, thoughts tables
+├── mcp/              # MCP server runtime
+├── lsp/              # LSP client
+├── telegram/         # Telegram bridge
+├── verify/           # Verification recipes and orchestration
+└── types/
+    └── index.ts      # Shared TypeScript types
+```
+
+## Key Patterns
+
+- **Agent loop**: `Agent.processMessage()` is an async generator that yields `StreamChunk` objects — the LLM responds, tools execute, results feed back until no more tool calls remain or `maxToolRounds` is reached.
+- **Tools**: Built with `tool()` + zod schemas. Tools return `ToolResult` and never throw.
+- **Subagents**: `subagent` runs an agent in a child session (foreground by default, `background=true` for async runs, `sessionID` for follow-ups). Agents are defined by Markdown files (project `.crow/agents/` > global `~/.crow/agents/` > settings customs > six built-ins: explorer, builder, reviewer, tester, planner, general-purpose). Child sessions persist in the sessions table with a parent link.
+- **Thought persistence**: Provider reasoning is captured from the raw SSE stream (the AI SDK drops `reasoning_content` in chat completions), stored per turn with its duration, and shown in history as a clickable Thought line.
+- **Providers**: 206 built-in OpenAI-compatible providers. Keys are saved by `/connect` to `~/.crow/auth.json` (mode 600). A custom provider can be added with any base URL, key, and model.
+- **Settings hierarchy**: Environment variables (`CROW_PROVIDER`, `CROW_MODEL`, `CROW_MAX_TOKENS`) → User-level (`~/.crow/user-settings.json`) → Project-level (`.crow/settings.json`).
+- **Custom instructions**: `~/.crow/AGENTS.md`, then `AGENTS.override.md` / `AGENTS.md` per directory from git root through the workspace cwd (Codex-style merge).
+- **ESM only**: The project uses `"type": "module"` — all imports use `.js` extensions for compiled output.
+
+## CI/CD
+
+- **typecheck.yml**: Runs `tsc --noEmit` on push/PR to `main`/`develop`.
+- **security.yml**: Runs `npm audit` and TruffleHog secret scanning.
+- **release.yml**: Runs on `crow@*` tags and publishes Linux, macOS, and Windows binaries.
