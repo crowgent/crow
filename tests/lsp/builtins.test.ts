@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./npm-cache", () => ({
+vi.mock("../../src/lsp/npm-cache", () => ({
   lspNpmWhich: vi.fn(async () => null),
 }));
 

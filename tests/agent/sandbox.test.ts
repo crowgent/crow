@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 async function importAgentModule() {
   vi.resetModules();
-  vi.doMock("../storage/index", () => ({
+  vi.doMock("../../src/storage/index", () => ({
     appendCompaction: vi.fn(),
     appendMessages: vi.fn(() => []),
     appendSystemMessage: vi.fn(() => 0),
@@ -37,7 +37,7 @@ async function importAgentModule() {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetModules();
-  vi.doUnmock("../storage/index");
+  vi.doUnmock("../../src/storage/index");
 });
 
 describe("Agent sandbox mode", () => {

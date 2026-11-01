@@ -149,8 +149,10 @@ describe("checkForUpdate", () => {
 
 describe("runUpdate", () => {
   it("returns success when the script-managed updater succeeds", async () => {
-    vi.doMock("./install-manager", async () => {
-      const actual = await vi.importActual<typeof import("../../src/utils/install-manager")>("./install-manager");
+    vi.doMock("../../src/utils/install-manager", async () => {
+      const actual = await vi.importActual<typeof import("../../src/utils/install-manager")>(
+        "../../src/utils/install-manager",
+      );
       return {
         ...actual,
         runScriptManagedUpdate: vi.fn().mockResolvedValue({ success: true, output: "Updated to Crow 2.0.0." }),
@@ -165,8 +167,10 @@ describe("runUpdate", () => {
   });
 
   it("returns failure when the script-managed updater fails", async () => {
-    vi.doMock("./install-manager", async () => {
-      const actual = await vi.importActual<typeof import("../../src/utils/install-manager")>("./install-manager");
+    vi.doMock("../../src/utils/install-manager", async () => {
+      const actual = await vi.importActual<typeof import("../../src/utils/install-manager")>(
+        "../../src/utils/install-manager",
+      );
       return {
         ...actual,
         runScriptManagedUpdate: vi.fn().mockResolvedValue({ success: false, output: "permission denied" }),

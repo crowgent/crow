@@ -13,15 +13,15 @@ async function importAgentModuleWithRecapMocks() {
     },
   }));
 
-  vi.doMock("../crow/client", async () => {
-    const actual = await vi.importActual<typeof import("../../src/crow/client")>("../crow/client");
+  vi.doMock("../../src/crow/client", async () => {
+    const actual = await vi.importActual<typeof import("../../src/crow/client")>("../../src/crow/client");
     return {
       ...actual,
       generateRecap,
     };
   });
 
-  vi.doMock("../storage/index", () => ({
+  vi.doMock("../../src/storage/index", () => ({
     appendCompaction: vi.fn(),
     appendMessages: vi.fn(() => []),
     appendSystemMessage: vi.fn(() => 0),
@@ -68,8 +68,8 @@ async function importAgentModuleWithRecapMocks() {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetModules();
-  vi.doUnmock("../crow/client");
-  vi.doUnmock("../storage/index");
+  vi.doUnmock("../../src/crow/client");
+  vi.doUnmock("../../src/storage/index");
 });
 
 describe("Agent session recap", () => {

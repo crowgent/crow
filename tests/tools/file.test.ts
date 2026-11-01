@@ -43,7 +43,7 @@ const syncFileWithLspMock = vi.fn<
   },
 ]);
 
-vi.mock("../lsp/runtime", () => ({
+vi.mock("../../src/lsp/runtime", () => ({
   summarizeDiagnostics: (diagnostics: unknown) => summarizeDiagnosticsMock(diagnostics),
   syncFileWithLsp: (cwd: string, filePath: string, content: string, save: boolean, waitForDiagnostics: boolean) =>
     syncFileWithLspMock(cwd, filePath, content, save, waitForDiagnostics),

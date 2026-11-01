@@ -10,7 +10,7 @@ const queryLspMock = vi.fn<(cwd: string, input: unknown) => Promise<{ success: b
   }),
 );
 
-vi.mock("../lsp/runtime", () => ({
+vi.mock("../../src/lsp/runtime", () => ({
   isLspToolEnabled: vi.fn(() => true),
   queryLsp: (cwd: string, input: unknown) => queryLspMock(cwd, input),
 }));

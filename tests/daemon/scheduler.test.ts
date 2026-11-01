@@ -17,7 +17,7 @@ async function importSchedulerModule(mocks: {
   const removeScheduleDaemonPid = mocks.removeScheduleDaemonPid ?? vi.fn(async () => {});
   const cronMatchesDate = mocks.cronMatchesDate ?? vi.fn(() => true);
 
-  vi.doMock("../tools/schedule", () => ({
+  vi.doMock("../../src/tools/schedule", () => ({
     ScheduleManager: class {
       list = mocks.list;
       touchLastRunAt = mocks.touchLastRunAt;

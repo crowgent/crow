@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./checkpoint", () => ({
+vi.mock("../../src/verify/checkpoint", () => ({
   ensureVerifyCheckpoint: vi.fn(async () => ({ created: false })),
 }));
 
