@@ -5,7 +5,15 @@ APP="crow"
 REPO="crowgent/crow"
 RELEASES_API="https://api.github.com/repos/${REPO}/releases"
 USER_DIR="${HOME}/.crow"
-INSTALL_DIR="${USER_DIR}/bin"
+# Install straight into a directory that is already on PATH when possible, so
+# `crow` works in the current shell with no manual export. An install that
+# already lives in ~/.crow/bin is moved there on re-run by
+# migrate_legacy_install below (old binary and PATH line cleaned up).
+if [[ -w /usr/local/bin ]]; then
+  INSTALL_DIR="/usr/local/bin"
+else
+  INSTALL_DIR="${USER_DIR}/bin"
+fi
 METADATA_PATH="${USER_DIR}/install.json"
 PATH_MARKER="# crow"
 
@@ -65,8 +73,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-mkdir -p "$INSTALL_DIR"
-chmod 700 "$USER_DIR" "$INSTALL_DIR"
+mkdir -p "$USER_DIR"
+chmod 700 "$USER_DIR"
+if [[ "$INSTALL_DIR" == "${USER_DIR}/bin" ]]; then
+  mkdir -p "$INSTALL_DIR"
+  chmod 700 "$INSTALL_DIR"
+fi
 
 resolve_target() {
   local raw_os arch
@@ -183,6 +195,24 @@ add_to_path() {
   printf '\n%s\n%s\n' "$PATH_MARKER" "$command" >> "$config_file"
   written_config_file="$config_file"
   written_path_command="$command"
+}
+
+migrate_legacy_install() {
+  local old_config old_command old_binary tmp_file
+  [[ -f "$METADATA_PATH" ]] || return 0
+  old_binary=$(sed -n 's/.*"binaryPath":[[:space:]]*"\([^"]*\)".*/\1/p' "$METADATA_PATH" | head -n 1)
+  [[ -n "$old_binary" && "$old_binary" != "${INSTALL_DIR}/${BINARY_NAME}" ]] || return 0
+  if [[ -f "$old_binary" ]]; then
+    rm -f "$old_binary"
+  fi
+  old_config=$(sed -n 's/.*"shellConfigPath":[[:space:]]*"\([^"]*\)".*/\1/p' "$METADATA_PATH" | head -n 1)
+  old_command=$(sed -n 's/.*"pathCommand":[[:space:]]*"\([^"]*\)".*/\1/p' "$METADATA_PATH" | head -n 1)
+  if [[ -n "$old_config" && -n "$old_command" && -f "$old_config" ]]; then
+    tmp_file="${old_config}.crow-tmp"
+    grep -vxF -e "$old_command" -e "$PATH_MARKER" "$old_config" > "$tmp_file" || true
+    mv "$tmp_file" "$old_config"
+  fi
+  return 0
 }
 
 maybe_update_path() {
@@ -308,6 +338,7 @@ else
   install_downloaded_release
 fi
 
+migrate_legacy_install
 maybe_update_path
 resolve_installed_version
 write_metadata "$INSTALLED_VERSION"

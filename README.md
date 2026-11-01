@@ -36,7 +36,12 @@ static marker instead of a moving spinner.
 curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
 ```
 
-This installs the latest release binary to `~/.crow/bin` and adds it to your PATH.
+This installs the latest release binary. When a directory already on PATH is
+writable (for example `/usr/local/bin`), the binary goes there so `crow`
+works immediately in the current shell with no manual export. An install that
+already lives in `~/.crow/bin` moves there on re-run (the old binary and its
+PATH line are cleaned up). Otherwise the binary goes to `~/.crow/bin` and the
+installer adds that directory to your shell config.
 
 ## Install from source
 

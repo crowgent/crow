@@ -237,6 +237,7 @@ export function buildScriptUninstallPlan(
   const pruneDirs = new Set<string>();
 
   if (!options.keepConfig && !options.keepData) {
+    removePaths.add(context.binaryPath);
     removePaths.add(userDir);
   } else {
     removePaths.add(context.binaryPath);
