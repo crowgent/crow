@@ -45,7 +45,6 @@
     "@ai-sdk/mcp": "^1.0.25",
     "@ai-sdk/openai": "^3.0.135",
     "@ai-sdk/provider-utils": "^4.0.21",
-    "@coinbase/agentkit": "^0.10.4",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@npmcli/arborist": "^9.4.2",
     "@opentui/core": "^0.1.88",
