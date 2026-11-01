@@ -315,6 +315,13 @@ write_metadata "$INSTALLED_VERSION"
 echo ""
 echo "Crow ${INSTALLED_VERSION} installed to ${INSTALL_DIR}/${BINARY_NAME}"
 echo ""
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+  echo "Note: this shell does not have ${INSTALL_DIR} in PATH yet, so 'crow'"
+  echo "will say 'command not found' until you run one of these:"
+  echo "  export PATH=${INSTALL_DIR}:\$PATH"
+  echo "or start a new shell."
+  echo ""
+fi
 echo "Run:"
 echo "  crow --help"
 echo ""
