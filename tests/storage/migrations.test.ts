@@ -9,7 +9,7 @@ describe("applyMigrations", () => {
     applyMigrations(db);
 
     expect(db.sessionColumns).toEqual(
-      new Set(["id", "workspace_id", "title", "model", "recap_text", "recap_model", "recap_updated_at"]),
+      new Set(["id", "workspace_id", "title", "model", "recap_text", "recap_model", "recap_updated_at", "parent_id"]),
     );
   });
 });

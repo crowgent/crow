@@ -27,8 +27,8 @@ import type {
   AgentMode,
   SessionInfo,
   StreamChunk,
+  SubagentRequest,
   SubagentStatus,
-  TaskRequest,
   ToolCall,
   ToolResult,
   UsageSource,
@@ -101,8 +101,7 @@ export interface LoopContext {
   discardAbortedTurn(userMessage: ModelMessage): void;
   refreshSessionRecap(signal?: AbortSignal): Promise<void>;
   consumeBackgroundNotifications(): Promise<string[]>;
-  runTask(request: TaskRequest, abortSignal?: AbortSignal): Promise<ToolResult>;
-  runDelegation(request: TaskRequest, abortSignal?: AbortSignal): Promise<ToolResult>;
+  runSubagent(request: SubagentRequest, abortSignal?: AbortSignal): Promise<ToolResult>;
   readDelegation(id: string): Promise<ToolResult>;
   listDelegations(): Promise<ToolResult>;
 }
@@ -203,8 +202,7 @@ async function* processMessageBatchTurn(
       const baseTools = createTools(ctx.bash, provider, ctx.mode, {
         modelId: ctx.modelId,
         providerId: ctx.providerId ?? undefined,
-        runTask: (request, abortSignal) => ctx.runTask(request, combineAbortSignals(signal, abortSignal)),
-        runDelegation: (request, abortSignal) => ctx.runDelegation(request, combineAbortSignals(signal, abortSignal)),
+        runSubagent: (request, abortSignal) => ctx.runSubagent(request, combineAbortSignals(signal, abortSignal)),
         readDelegation: (id) => ctx.readDelegation(id),
         listDelegations: () => ctx.listDelegations(),
         scheduleManager: ctx.schedules,
@@ -524,8 +522,7 @@ export async function* processMessage(
         const baseTools = createTools(ctx.bash, provider, ctx.mode, {
           modelId: ctx.modelId,
           providerId: ctx.providerId ?? undefined,
-          runTask: (request, abortSignal) => ctx.runTask(request, combineAbortSignals(signal, abortSignal)),
-          runDelegation: (request, abortSignal) => ctx.runDelegation(request, combineAbortSignals(signal, abortSignal)),
+          runSubagent: (request, abortSignal) => ctx.runSubagent(request, combineAbortSignals(signal, abortSignal)),
           readDelegation: (id) => ctx.readDelegation(id),
           listDelegations: () => ctx.listDelegations(),
           scheduleManager: ctx.schedules,

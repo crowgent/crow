@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import type { ModelMessage } from "ai";
 import { InvalidArgumentError, program } from "commander";
 import readline from "readline";
 import packageJson from "../package.json";
@@ -12,6 +13,7 @@ import {
   renderHeadlessChunk,
   renderHeadlessPrelude,
 } from "./headless/output";
+import { appendMessages, loadTranscript, SessionStore } from "./storage/index";
 import { runTelegramHeadlessBridge } from "./telegram/headless-bridge";
 import { startScheduleDaemon } from "./tools/schedule";
 import { processAtMentions } from "./utils/at-mentions.js";
@@ -281,11 +283,27 @@ async function runBackgroundDelegation(jobPath: string, options: CliOptions) {
       batchApi: Boolean(delegation.batchApi ?? options.batchApi === true),
       providerId: config.providerId,
     });
-    const result = await agent.runTaskRequest({
-      agent: delegation.agent,
-      description: delegation.description,
-      prompt: delegation.prompt,
-    });
+    let history: ModelMessage[] = [];
+    if (delegation.sessionId) {
+      try {
+        const store = new SessionStore(delegation.cwd);
+        if (store.getSessionById(delegation.sessionId)) {
+          history = loadTranscript(delegation.sessionId);
+        }
+      } catch {
+        history = [];
+      }
+    }
+    const result = await agent.runTaskRequest(
+      {
+        agent: delegation.agent,
+        description: delegation.description,
+        prompt: delegation.prompt,
+      },
+      undefined,
+      undefined,
+      { history },
+    );
 
     output = (result.output || "").trim();
 
@@ -294,6 +312,20 @@ async function runBackgroundDelegation(jobPath: string, options: CliOptions) {
       return;
     }
 
+    if (delegation.sessionId) {
+      try {
+        const store = new SessionStore(delegation.cwd);
+        if (store.getSessionById(delegation.sessionId)) {
+          appendMessages(delegation.sessionId, [
+            { role: "user", content: delegation.prompt },
+            { role: "assistant", content: output },
+          ]);
+          store.touchSession(delegation.sessionId, delegation.cwd);
+        }
+      } catch {
+        // Best effort — the delegation record already holds the completed output.
+      }
+    }
     await completeDelegation(jobPath, output, result.task?.summary);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

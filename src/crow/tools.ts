@@ -21,16 +21,15 @@ import {
 import { editFile, readFile, writeFile } from "../tools/file";
 import { executeGrep } from "../tools/grep";
 import type { ScheduleDaemonStatus, ScheduleManager, StoredSchedule } from "../tools/schedule";
-import type { AgentMode, TaskRequest, ToolResult } from "../types/index";
-import { type AgentDefinition, delegatableAgentNames, isDelegatable } from "../utils/agent-files";
+import type { AgentMode, SubagentRequest, ToolResult } from "../types/index";
+import { type AgentDefinition, isDelegatable } from "../utils/agent-files";
 import { type CustomSubagentConfig, loadValidSubAgents } from "../utils/settings";
 import type { CrowProvider } from "./client";
 
 interface CreateToolsOptions {
   modelId?: string;
   providerId?: string;
-  runTask?: (request: TaskRequest, abortSignal?: AbortSignal) => Promise<ToolResult>;
-  runDelegation?: (request: TaskRequest, abortSignal?: AbortSignal) => Promise<ToolResult>;
+  runSubagent?: (request: SubagentRequest, abortSignal?: AbortSignal) => Promise<ToolResult>;
   readDelegation?: (id: string) => Promise<ToolResult>;
   listDelegations?: () => Promise<ToolResult>;
   scheduleManager?: ScheduleManager;
@@ -265,21 +264,9 @@ export function createTools(
     });
   }
 
-  if (options.runTask) {
+  if (options.runSubagent) {
     const registryDefinitions = (options.agentDefinitions ?? []).filter(isDelegatable);
-    const registryNames = delegatableAgentNames(options.agentDefinitions ?? []);
     const customNames = (options.subagents ?? loadValidSubAgents()).map((agent) => agent.name);
-    const extraNames = [...registryNames, ...customNames].filter((name, index, list) => list.indexOf(name) === index);
-    const taskAgentEnum = [
-      "general",
-      "explore",
-      "vision",
-      "verify",
-      "verify-detect",
-      "verify-manifest",
-      "computer",
-      ...extraNames,
-    ] as [string, ...string[]];
     const customHint =
       customNames.length > 0
         ? ` You may also use these user-defined sub-agents by exact name: ${customNames.join(", ")}.`
@@ -290,22 +277,35 @@ export function createTools(
     const routingHint =
       routingLines.length > 0 ? ` Available sub-agents and when to use them:\n${routingLines.join("\n")}` : "";
 
-    tools.task = tool({
-      description: `Delegate a focused foreground task to a sub-agent. Prefer this proactively for review, research, investigation, code quality work, verification, and computer-use flows instead of waiting for the user to request a sub-agent. Use \`general\` for multi-step execution, \`explore\` for fast read-only investigation, \`vision\` for image validation, \`verify\` for sandbox-aware build, test, and smoke validation, \`verify-detect\` for read-only verification recipe detection, \`verify-manifest\` to create or update a verification manifest, and \`computer\` for host desktop screenshot/input workflows.${customHint}${routingHint} Provide a short description plus a detailed prompt for the child agent.`,
+    tools.subagent = tool({
+      description: `Spawns an agent in a child session to work on the specified task. New child sessions start with fresh context, so include all relevant context and instructions in the prompt. Foreground (default) runs the subagent to completion and returns its final response. Background mode (background=true) launches it asynchronously and returns immediately with a sessionID; you will be notified when it completes, do not poll for progress or duplicate its work. To send follow-ups to a running or finished subagent, call subagent again with its sessionID. Prefer this proactively for review, research, investigation, code quality work, verification, and computer-use flows instead of waiting for the user to request a sub-agent. Use \`general\` for multi-step execution, \`explore\` for fast read-only investigation, \`vision\` for image validation, \`verify\` for sandbox-aware build, test, and smoke validation, \`verify-detect\` for read-only verification recipe detection, \`verify-manifest\` to create or update a verification manifest, and \`computer\` for host desktop screenshot/input workflows.${customHint}${routingHint}`,
       inputSchema: z.object({
         agent: z
-          .enum(taskAgentEnum)
-          .default("general")
+          .string()
           .describe(
-            extraNames.length > 0
-              ? "Built-in general, explore, vision, verify, verify-detect, verify-manifest, or computer, or a Markdown-defined or configured custom sub-agent name"
-              : "Which sub-agent to use",
+            "The type of specialized agent to use, such as general, explore, vision, verify, verify-detect, verify-manifest, computer, or a Markdown-defined or configured custom sub-agent name",
           ),
-        description: z.string().describe("A short label for the delegated task, such as 'Deep code quality analysis'"),
+        description: z.string().describe("A short 3-5 word label for the task, displayed to the user"),
         prompt: z.string().describe("Detailed instructions for the sub-agent to complete"),
+        model: z
+          .string()
+          .optional()
+          .describe(
+            'Optional model override as "providerID/modelID" (for example "xai/grok-4.7") or a model id within the current provider. Never set this unless the user explicitly asks for a particular model.',
+          ),
+        sessionID: z
+          .string()
+          .optional()
+          .describe("Send a follow-up to an existing subagent, running or finished. Omit to start a new one."),
+        background: z
+          .boolean()
+          .optional()
+          .describe(
+            "Run the subagent in the background and return immediately. You will be notified when it completes. Do not sleep, poll, or proactively check on its progress.",
+          ),
       }),
-      execute: async ({ agent, description, prompt }, { abortSignal }) => {
-        return options.runTask!({ agent, description, prompt }, abortSignal);
+      execute: async ({ agent, description, prompt, model, sessionID, background }, { abortSignal }) => {
+        return options.runSubagent!({ agent, description, prompt, model, sessionID, background }, abortSignal);
       },
     });
   }
@@ -515,24 +515,6 @@ export function createTools(
         return editFile(path, old_string, new_string, cwd());
       },
     });
-
-    if (options.runDelegation) {
-      tools.delegate = tool({
-        description:
-          "Launch a read-only background agent that can keep researching while you continue working. Use this only for `explore` tasks that do not edit files or make shell changes. You will be notified when it completes.",
-        inputSchema: z.object({
-          agent: z
-            .enum(["explore"])
-            .default("explore")
-            .describe("Background delegations currently support only the read-only explore agent"),
-          description: z.string().describe("A short label for the delegation, such as 'OAuth callback research'"),
-          prompt: z.string().describe("Detailed instructions for the background agent to complete"),
-        }),
-        execute: async ({ agent, description, prompt }, { abortSignal }) => {
-          return options.runDelegation!({ agent, description, prompt }, abortSignal);
-        },
-      });
-    }
 
     if (options.readDelegation) {
       tools.delegation_read = tool({

@@ -16,10 +16,11 @@ const ID_ANIMALS = ["badger", "falcon", "fox", "heron", "lynx", "otter", "owl", 
 
 export interface StoredDelegation {
   id: string;
-  agent: "explore";
+  agent: string;
   description: string;
   prompt: string;
   cwd: string;
+  sessionId?: string;
   model: string;
   sandboxMode: SandboxMode;
   sandboxSettings?: SandboxSettings;
@@ -49,6 +50,7 @@ interface StartDelegationOptions {
   maxToolRounds: number;
   maxTokens: number;
   batchApi?: boolean;
+  sessionId?: string;
 }
 
 export interface DelegationContext {
@@ -71,6 +73,7 @@ export async function runDelegation(
   ctx: DelegationContext,
   request: TaskRequest,
   abortSignal?: AbortSignal,
+  childSessionId?: string,
 ): Promise<ToolResult> {
   const taskCreatedInput: TaskCreatedHookInput = {
     hook_event_name: "TaskCreated",
@@ -94,6 +97,7 @@ export async function runDelegation(
       maxToolRounds: ctx.maxToolRounds,
       maxTokens: ctx.maxTokens,
       batchApi: ctx.batchApi,
+      sessionId: childSessionId,
     });
   } catch (err: unknown) {
     if (abortSignal?.aborted) throw err;
@@ -171,14 +175,6 @@ export class DelegationManager {
       };
     }
 
-    if (request.agent !== "explore") {
-      return {
-        success: false,
-        output:
-          "Background delegations are read-only. Use `delegate` with the `explore` agent, or use `task` for foreground work that may edit files.",
-      };
-    }
-
     const rawMaxConcurrent = loadUserSettings().subagents?.maxConcurrent;
     const maxConcurrent =
       typeof rawMaxConcurrent === "number" && Number.isFinite(rawMaxConcurrent) && rawMaxConcurrent > 0
@@ -203,10 +199,11 @@ export class DelegationManager {
 
     const record: StoredDelegation = {
       id,
-      agent: "explore",
+      agent: request.agent,
       description: request.description,
       prompt: request.prompt,
       cwd,
+      sessionId: options.sessionId,
       model: options.model,
       sandboxMode: options.sandboxMode,
       sandboxSettings: options.sandboxSettings,
@@ -244,7 +241,7 @@ export class DelegationManager {
 
     const output = [
       `Delegation started: ${id}`,
-      "Agent: explore",
+      `Agent: ${request.agent}`,
       "You will be notified when it completes.",
       `Use \`delegation_read("${id}")\` to retrieve the full result later.`,
     ].join("\n");
@@ -254,7 +251,7 @@ export class DelegationManager {
       output,
       delegation: {
         id,
-        agent: "explore",
+        agent: request.agent,
         description: request.description,
         summary: "Running in the background.",
         status: "running",

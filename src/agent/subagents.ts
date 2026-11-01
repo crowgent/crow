@@ -1,14 +1,30 @@
-import { stepCountIs, streamText, type ToolSet } from "ai";
-import { type CrowProvider, resolveModelRuntime } from "../crow/client";
+import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai";
+import { type CrowProvider, createProvider, resolveModelRuntime } from "../crow/client";
 import { normalizeModelId } from "../crow/models";
 import { createTools } from "../crow/tools";
 import type { executeEventHooks } from "../hooks/index";
-import type { SubagentStartHookInput, SubagentStopHookInput } from "../hooks/types";
 import { buildMcpToolSet } from "../mcp/runtime";
+import { appendMessages, loadTranscript, type SessionStore } from "../storage/index";
 import { BashTool } from "../tools/bash";
-import type { AgentMode, SubagentStatus, TaskRequest, ToolResult, UsageSource, VerifyRecipe } from "../types/index";
+import type {
+  AgentMode,
+  SubagentRequest,
+  SubagentStatus,
+  TaskRequest,
+  ToolResult,
+  UsageSource,
+  VerifyRecipe,
+} from "../types/index";
 import { builtinAgentDefinitions, findAgentDefinition, loadAgentDefinitions } from "../utils/agent-files";
-import { loadMcpServers, loadUserSettings, loadValidSubAgents, type SandboxSettings } from "../utils/settings";
+import { findProvider } from "../utils/providers";
+import {
+  getProviderApiKey,
+  loadCustomProviders,
+  loadMcpServers,
+  loadUserSettings,
+  loadValidSubAgents,
+  type SandboxSettings,
+} from "../utils/settings";
 import { prepareVerifySandbox } from "../verify/entrypoint";
 import { type BatchContext, firstLine, runTaskRequestBatch } from "./batch";
 import { applyModelConstraints, buildFileAgentPrompt, buildSubagentPrompt, findCustomSubagent } from "./prompts";
@@ -24,6 +40,7 @@ export interface SubagentContext {
   batchApi: boolean;
   batch: BatchContext;
   sessionId?: string;
+  sessionStore?: SessionStore | null;
   fireHook: (
     input: Parameters<typeof executeEventHooks>[0],
     signal?: AbortSignal,
@@ -36,11 +53,17 @@ export interface SubagentContext {
   ) => void;
 }
 
+export interface RunTaskRequestOptions {
+  modelOverride?: string;
+  history?: ModelMessage[];
+}
+
 export async function runTaskRequest(
   ctx: SubagentContext,
   request: TaskRequest,
   onActivity?: (detail: string) => void,
   abortSignal?: AbortSignal,
+  opts?: RunTaskRequestOptions,
 ): Promise<ToolResult> {
   const provider = ctx.provider;
   const signal = abortSignal;
@@ -133,7 +156,12 @@ export async function runTaskRequest(
       : ctx.bash.getSandboxSettings(),
   });
   const childModelId = normalizeModelId(
-    fileDefinition && fileDefinition.model !== "inherit" ? fileDefinition.model : custom ? custom.model : ctx.modelId,
+    opts?.modelOverride ??
+      (fileDefinition && fileDefinition.model !== "inherit"
+        ? fileDefinition.model
+        : custom
+          ? custom.model
+          : ctx.modelId),
   );
   const settingsDefaultMaxTurns = (() => {
     const value = loadUserSettings().subagents?.defaultMaxTurns;
@@ -233,9 +261,10 @@ export async function runTaskRequest(
         ? `${request.prompt}\n\nPrepared verify recipe JSON (use this as the primary execution recipe and keep .crow/environment.json aligned with it if present):\n${JSON.stringify(verifyPreparedRecipe, null, 2)}`
         : request.prompt;
 
-    const childMessages = isVision
+    const baseMessages = isVision
       ? await buildVisionUserMessages(request.prompt, childBash.getCwd(), signal)
       : [{ role: "user" as const, content: childPrompt }];
+    const childMessages = [...(opts?.history ?? []), ...baseMessages];
 
     if (ctx.batchApi) {
       return await runTaskRequestBatch(ctx.batch, {
@@ -321,50 +350,92 @@ export async function runTaskRequest(
   }
 }
 
-export async function runTask(
+export async function runSubagentSession(
   ctx: SubagentContext,
-  request: TaskRequest,
+  request: SubagentRequest,
+  onActivity?: (detail: string) => void,
   abortSignal?: AbortSignal,
 ): Promise<ToolResult> {
-  const startInput: SubagentStartHookInput = {
-    hook_event_name: "SubagentStart",
-    agent_type: request.agent,
-    description: request.description,
-    session_id: ctx.sessionId,
-    cwd: ctx.bash.getCwd(),
-  };
-  await ctx.fireHook(startInput, abortSignal).catch(() => {});
-
-  let result: ToolResult;
-  try {
-    result = await runTaskRequest(
-      ctx,
-      request,
-      (detail) => {
-        if (abortSignal?.aborted) return;
-        ctx.emitSubagentStatus({
-          agent: request.agent,
-          description: request.description,
-          detail,
-        });
-      },
-      abortSignal,
-    );
-  } finally {
-    ctx.emitSubagentStatus(null);
+  let runCtx = ctx;
+  let modelOverride: string | undefined;
+  const rawModel = request.model?.trim();
+  if (rawModel) {
+    const slash = rawModel.indexOf("/");
+    if (slash > 0) {
+      const providerId = rawModel.slice(0, slash);
+      const modelId = rawModel.slice(slash + 1);
+      const providerDef = findProvider(providerId, loadCustomProviders());
+      if (!providerDef) {
+        return {
+          success: false,
+          output: `Unknown provider "${providerId}". Use "providerID/modelID" with a configured provider.`,
+        };
+      }
+      const apiKey = getProviderApiKey(providerId);
+      if (!apiKey) {
+        return {
+          success: false,
+          output: `No API key for provider "${providerId}". Set it with /connect.`,
+        };
+      }
+      runCtx = { ...ctx, provider: createProvider(apiKey, providerDef.baseUrl), providerId, modelId };
+      modelOverride = modelId;
+    } else {
+      modelOverride = rawModel;
+    }
   }
 
-  const stopInput: SubagentStopHookInput = {
-    hook_event_name: "SubagentStop",
-    agent_type: request.agent,
-    description: request.description,
-    success: result.success,
-    session_id: ctx.sessionId,
-    cwd: ctx.bash.getCwd(),
-  };
-  await ctx.fireHook(stopInput, abortSignal).catch(() => {});
+  const store = ctx.sessionStore ?? null;
+  let childId: string | null = null;
+  let history: ModelMessage[] = [];
+  if (store && request.sessionID) {
+    const existing = store.getSessionById(request.sessionID);
+    if (!existing) {
+      return { success: false, output: `Unknown subagent session "${request.sessionID}".` };
+    }
+    if (existing.parentId !== null && ctx.sessionId !== undefined && existing.parentId !== ctx.sessionId) {
+      return { success: false, output: `Subagent session "${request.sessionID}" belongs to another conversation.` };
+    }
+    childId = existing.id;
+    history = loadTranscript(existing.id);
+  }
 
-  return result;
+  const result = await runTaskRequest(
+    runCtx,
+    { agent: request.agent, description: request.description, prompt: request.prompt },
+    onActivity,
+    abortSignal,
+    { modelOverride, history },
+  );
+  if (!result.success) {
+    return result;
+  }
+
+  if (store) {
+    try {
+      if (!childId) {
+        const child = store.createSession(runCtx.modelId, "agent", ctx.bash.getCwd(), ctx.sessionId ?? null);
+        store.setTitle(child.id, request.description);
+        childId = child.id;
+      }
+      appendMessages(childId, [
+        { role: "user", content: request.prompt },
+        { role: "assistant", content: result.output || "" },
+      ]);
+      store.touchSession(childId, ctx.bash.getCwd());
+    } catch {
+      childId = null;
+    }
+  }
+
+  if (!childId) {
+    return result;
+  }
+  return {
+    ...result,
+    output: `${result.output}\n\n[subagent session: ${childId} — pass sessionID to continue this subagent.]`,
+    task: result.task ? { ...result.task, sessionId: childId } : undefined,
+  };
 }
 
 export function formatSubagentActivity(toolName: string, args?: unknown): string {

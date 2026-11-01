@@ -64,10 +64,11 @@ describe("Agent sandbox mode", () => {
     const startMock = vi.fn(async () => ({ success: true, output: "ok" }));
     (agent as unknown as { delegations: { start: typeof startMock } }).delegations.start = startMock;
 
-    await (agent as unknown as { runDelegation: (request: unknown) => Promise<unknown> }).runDelegation({
+    await (agent as unknown as { runSubagent: (request: unknown) => Promise<unknown> }).runSubagent({
       agent: "explore",
       description: "Inspect",
       prompt: "Look around",
+      background: true,
     });
 
     expect(startMock).toHaveBeenCalledWith(
@@ -101,10 +102,11 @@ describe("Agent sandbox mode", () => {
     const startMock = vi.fn(async () => ({ success: true, output: "ok" }));
     (agent as unknown as { delegations: { start: typeof startMock } }).delegations.start = startMock;
 
-    await (agent as unknown as { runDelegation: (request: unknown) => Promise<unknown> }).runDelegation({
+    await (agent as unknown as { runSubagent: (request: unknown) => Promise<unknown> }).runSubagent({
       agent: "explore",
       description: "Inspect",
       prompt: "Look around",
+      background: true,
     });
 
     expect(startMock).toHaveBeenCalledWith(

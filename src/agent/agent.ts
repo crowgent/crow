@@ -7,7 +7,12 @@ import {
 } from "../crow/client";
 import { normalizeModelId } from "../crow/models";
 import { executeEventHooks } from "../hooks/index";
-import type { NotificationHookInput, SessionEndHookInput } from "../hooks/types";
+import type {
+  NotificationHookInput,
+  SessionEndHookInput,
+  SubagentStartHookInput,
+  SubagentStopHookInput,
+} from "../hooks/types";
 import { shutdownWorkspaceLspManager } from "../lsp/runtime";
 import {
   appendSystemMessage,
@@ -26,6 +31,7 @@ import type {
   SessionInfo,
   SessionSnapshot,
   StreamChunk,
+  SubagentRequest,
   SubagentStatus,
   TaskRequest,
   ToolCall,
@@ -63,7 +69,8 @@ import {
 import { buildSystemPrompt } from "./prompts";
 import {
   formatSubagentActivity,
-  runTask as runSubagentTask,
+  type RunTaskRequestOptions,
+  runSubagentSession as runSubagentSessionTask,
   runTaskRequest as runSubagentTaskRequest,
   type SubagentContext,
   truncate,
@@ -572,6 +579,7 @@ export class Agent {
       batchApi: this.batchApi,
       batch: this.batchContext,
       sessionId: this.session?.id,
+      sessionStore: this.sessionStore,
       fireHook: (input, signal) => this.fireHook(input, signal),
       emitSubagentStatus: (status) => this.emitSubagentStatus(status),
       recordUsage: (usage, source, modelId) => this.recordUsage(usage, source, modelId),
@@ -582,12 +590,91 @@ export class Agent {
     request: TaskRequest,
     onActivity?: (detail: string) => void,
     abortSignal?: AbortSignal,
+    opts?: RunTaskRequestOptions,
   ): Promise<ToolResult> {
-    return runSubagentTaskRequest(this.subagentContext, request, onActivity, abortSignal);
+    return runSubagentTaskRequest(this.subagentContext, request, onActivity, abortSignal, opts);
   }
 
-  private async runTask(request: TaskRequest, abortSignal?: AbortSignal): Promise<ToolResult> {
-    return runSubagentTask(this.subagentContext, request, abortSignal);
+  async runSubagentForeground(
+    request: SubagentRequest,
+    onActivity?: (detail: string) => void,
+    abortSignal?: AbortSignal,
+  ): Promise<ToolResult> {
+    return runSubagentSessionTask(this.subagentContext, request, onActivity, abortSignal);
+  }
+
+  private async runSubagent(request: SubagentRequest, abortSignal?: AbortSignal): Promise<ToolResult> {
+    if (request.background) {
+      const store = this.sessionStore;
+      let childId: string | undefined;
+      if (store && request.sessionID) {
+        const existing = store.getSessionById(request.sessionID);
+        if (existing) childId = existing.id;
+      }
+      if (store && !childId) {
+        const child = store.createSession(this.modelId, "agent", this.bash.getCwd(), this.session?.id ?? null);
+        store.setTitle(child.id, request.description);
+        childId = child.id;
+      }
+      const result = await runDelegationTask(
+        this.delegationContext,
+        { agent: request.agent, description: request.description, prompt: request.prompt },
+        abortSignal,
+        childId,
+      );
+      if (!result.success) {
+        return result;
+      }
+      return {
+        ...result,
+        output: [
+          `The subagent is working in the background${childId ? ` (sessionID: ${childId})` : ""}. You will be notified automatically when it finishes.`,
+          "DO NOT sleep, poll for progress, ask the subagent for status, or duplicate this subagent's work; avoid working with the same files or topics it is using.",
+          "Work on non-overlapping tasks, or briefly tell the user what you launched and end your response.",
+          "To send it follow-ups or change its instructions while it runs, call subagent again with this sessionID.",
+        ].join("\n"),
+      };
+    }
+
+    const startInput: SubagentStartHookInput = {
+      hook_event_name: "SubagentStart",
+      agent_type: request.agent,
+      description: request.description,
+      session_id: this.session?.id,
+      cwd: this.bash.getCwd(),
+    };
+    await this.fireHook(startInput, abortSignal).catch(() => {});
+
+    let result: ToolResult;
+    try {
+      result = await runSubagentSessionTask(
+        this.subagentContext,
+        request,
+        (detail) => {
+          if (abortSignal?.aborted) return;
+          this.emitSubagentStatus({
+            agent: request.agent,
+            description: request.description,
+            detail,
+          });
+        },
+        abortSignal,
+      );
+    } finally {
+      this.emitSubagentStatus(null);
+    }
+
+    const stopInput: SubagentStopHookInput = {
+      hook_event_name: "SubagentStop",
+      agent_type: request.agent,
+      description: request.description,
+      success: result.success,
+      session_id: this.session?.id,
+      cwd: this.bash.getCwd(),
+    };
+    await this.fireHook(stopInput, abortSignal).catch(() => {});
+
+    return result;
   }
 
   private get delegationContext(): DelegationContext {
@@ -603,10 +690,6 @@ export class Agent {
       cwd: this.bash.getCwd(),
       fireHook: (input, signal) => this.fireHook(input, signal),
     };
-  }
-
-  private async runDelegation(request: TaskRequest, abortSignal?: AbortSignal): Promise<ToolResult> {
-    return runDelegationTask(this.delegationContext, request, abortSignal);
   }
 
   private async readDelegation(id: string): Promise<ToolResult> {
@@ -684,8 +767,7 @@ export class Agent {
       discardAbortedTurn: (userMessage) => this.discardAbortedTurn(userMessage),
       refreshSessionRecap: (signal) => this.refreshSessionRecap(signal),
       consumeBackgroundNotifications: () => this.consumeBackgroundNotifications(),
-      runTask: (request, abortSignal) => this.runTask(request, abortSignal),
-      runDelegation: (request, abortSignal) => this.runDelegation(request, abortSignal),
+      runSubagent: (request, abortSignal) => this.runSubagent(request, abortSignal),
       readDelegation: (id) => this.readDelegation(id),
       listDelegations: () => this.listDelegations(),
     };

@@ -2534,7 +2534,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         void (async () => {
           setDirectSubagent({ agent: assignName, description, detail: "Starting" });
           try {
-            const result = await agent.runTaskRequest(
+            const result = await agent.runSubagentForeground(
               { agent: assignName, description, prompt: assignTask },
               (detail) => {
                 setDirectSubagent((prev) => (prev ? { ...prev, detail } : prev));
@@ -3701,7 +3701,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               )}
               {/* Active tool calls — pending inline */}
               {activeToolCalls.map((tc) =>
-                tc.function.name === "task" ? (
+                tc.function.name === "task" || (tc.function.name === "subagent" && !tryParseArg(tc, "background")) ? (
                   <SubagentTaskLine
                     key={tc.id}
                     t={t}
@@ -3709,7 +3709,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                     label={toolArgs(tc) || "Working"}
                     pending
                   />
-                ) : tc.function.name === "delegate" ? (
+                ) : tc.function.name === "delegate" || tc.function.name === "subagent" ? (
                   <DelegationTaskLine
                     key={tc.id}
                     t={t}
@@ -4582,11 +4582,11 @@ function MessageView({
         return <PlanView plan={plan} t={t} />;
       }
 
-      if (name === "task" && entry.toolResult?.task) {
+      if ((name === "task" || name === "subagent") && entry.toolResult?.task) {
         return <TaskResultView t={t} entry={entry} />;
       }
 
-      if (name === "delegate" && entry.toolResult?.delegation) {
+      if ((name === "delegate" || name === "subagent") && entry.toolResult?.delegation) {
         return <DelegationResultView t={t} entry={entry} />;
       }
 
@@ -6028,7 +6028,7 @@ function toolArgs(tc?: ToolCall): string {
     if (tc.function.name === "read_file" || tc.function.name === "write_file" || tc.function.name === "edit_file")
       return a.path || "";
     if (tc.function.name === "generate_image" || tc.function.name === "generate_video") return a.prompt || "";
-    if (tc.function.name === "task") return a.description || "";
+    if (tc.function.name === "task" || tc.function.name === "subagent") return a.description || "";
     if (tc.function.name === "lsp") return `${a.operation || "query"} ${a.filePath || ""}`.trim();
     if (tc.function.name === "delegate") return a.description || "";
     if (tc.function.name === "delegation_read") return a.id || "";
@@ -6066,6 +6066,8 @@ function toolLabel(tc: ToolCall): string {
   if (tc.function.name === "generate_image") return `Generate image "${trunc(args, 60)}"`;
   if (tc.function.name === "generate_video") return `Generate video "${trunc(args, 60)}"`;
   if (tc.function.name === "task") return `Task ${trunc(args, 60)}`;
+  if (tc.function.name === "subagent")
+    return tryParseArg(tc, "background") ? `Background ${trunc(args, 60)}` : `Task ${trunc(args, 60)}`;
   if (tc.function.name === "delegate") return `Background ${trunc(args, 60)}`;
   if (tc.function.name === "delegation_read") return `Read delegation ${trunc(args, 60)}`;
   if (tc.function.name === "delegation_list") return "List delegations";

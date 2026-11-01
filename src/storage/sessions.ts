@@ -6,6 +6,7 @@ import { ensureWorkspace } from "./workspaces";
 interface SessionRow {
   id: string;
   workspace_id: string;
+  parent_id: string | null;
   title: string | null;
   recap_text: string | null;
   recap_model: string | null;
@@ -49,20 +50,21 @@ export class SessionStore {
     return this.getRequiredSession(session.id);
   }
 
-  createSession(model: string, mode: AgentMode, cwd: string): SessionInfo {
+  createSession(model: string, mode: AgentMode, cwd: string, parentId?: string | null): SessionInfo {
     const now = new Date().toISOString();
     const id = createSessionId();
     const db = getDatabase();
 
     db.prepare(`
       INSERT INTO sessions (
-        id, workspace_id, title, recap_text, recap_model, recap_updated_at, model, mode, cwd_at_start, cwd_last, status, created_at, updated_at
+        id, workspace_id, parent_id, title, recap_text, recap_model, recap_updated_at, model, mode, cwd_at_start, cwd_last, status, created_at, updated_at
       ) VALUES (
-        @id, @workspace_id, NULL, NULL, NULL, NULL, @model, @mode, @cwd_at_start, @cwd_last, 'active', @created_at, @updated_at
+        @id, @workspace_id, @parent_id, NULL, NULL, NULL, NULL, @model, @mode, @cwd_at_start, @cwd_last, 'active', @created_at, @updated_at
       )
     `).run({
       id,
       workspace_id: this.workspace.id,
+      parent_id: parentId ?? null,
       model,
       mode,
       cwd_at_start: cwd,
@@ -77,7 +79,7 @@ export class SessionStore {
   getLatestSession(): SessionInfo | null {
     const row = getDatabase()
       .prepare(`
-      SELECT id, workspace_id, title, recap_text, recap_model, recap_updated_at, model, mode, cwd_at_start, cwd_last, status, created_at, updated_at
+      SELECT id, workspace_id, parent_id, title, recap_text, recap_model, recap_updated_at, model, mode, cwd_at_start, cwd_last, status, created_at, updated_at
       FROM sessions
       WHERE workspace_id = ?
       ORDER BY updated_at DESC
@@ -91,7 +93,7 @@ export class SessionStore {
   getSessionById(id: string): SessionInfo | null {
     const row = getDatabase()
       .prepare(`
-      SELECT id, workspace_id, title, recap_text, recap_model, recap_updated_at, model, mode, cwd_at_start, cwd_last, status, created_at, updated_at
+      SELECT id, workspace_id, parent_id, title, recap_text, recap_model, recap_updated_at, model, mode, cwd_at_start, cwd_last, status, created_at, updated_at
       FROM sessions
       WHERE id = ?
     `)
@@ -171,6 +173,7 @@ function toSessionInfo(row: SessionRow): SessionInfo {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
+    parentId: row.parent_id ?? null,
     title: row.title,
     recap: toSessionRecap(row),
     model: row.model,

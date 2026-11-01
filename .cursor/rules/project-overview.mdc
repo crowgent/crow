@@ -25,7 +25,7 @@ Crow is an open-source AI coding agent that brings AI assistance directly into t
 src/
 ├── index.ts          # CLI entry point (Commander.js + OpenTUI)
 ├── agent/
-│   ├── agent.ts      # Agent loop, subagent dispatch, error formatting
+│   ├── agent.ts      # Agent coordinator, session management, subagent routing
 │   ├── delegations.ts # Background delegations (explore-only)
 │   ├── reasoning.ts  # Reasoning handling, encrypted-reasoning filtering
 │   └── compaction.ts # Conversation compaction
@@ -59,7 +59,7 @@ src/
 
 - **Agent loop**: `Agent.processMessage()` is an async generator that yields `StreamChunk` objects — the LLM responds, tools execute, results feed back until no more tool calls remain or `maxToolRounds` is reached.
 - **Tools**: Built with `tool()` + zod schemas. Tools return `ToolResult` and never throw.
-- **Subagents**: `task` runs a foreground subagent; `delegate` runs a background explore-only subagent. Agents are defined by Markdown files (project `.crow/agents/` > global `~/.crow/agents/` > settings customs > six built-ins: explorer, builder, reviewer, tester, planner, general-purpose).
+- **Subagents**: `subagent` runs an agent in a child session (foreground by default, `background=true` for async runs, `sessionID` for follow-ups). Agents are defined by Markdown files (project `.crow/agents/` > global `~/.crow/agents/` > settings customs > six built-ins: explorer, builder, reviewer, tester, planner, general-purpose). Child sessions persist in the sessions table with a parent link.
 - **Thought persistence**: Provider reasoning is captured from the raw SSE stream (the AI SDK drops `reasoning_content` in chat completions), stored per turn with its duration, and shown in history as a clickable Thought line.
 - **Providers**: 206 built-in OpenAI-compatible providers. Keys are saved by `/connect` to `~/.crow/auth.json` (mode 600). A custom provider can be added with any base URL, key, and model.
 - **Settings hierarchy**: Environment variables (`CROW_PROVIDER`, `CROW_MODEL`, `CROW_MAX_TOKENS`) → User-level (`~/.crow/user-settings.json`) → Project-level (`.crow/settings.json`).

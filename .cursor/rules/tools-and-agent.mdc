@@ -48,8 +48,7 @@ Tools should never throw — wrap errors in `{ success: false, error: "..." }`.
 | `read_file` | `src/tools/file.ts` | Read file contents |
 | `grep` | `src/tools/grep.ts` | Ripgrep-backed content search |
 | `search_web` | via the provider's web search tool | Provider-side web search |
-| `task` | `src/crow/tools.ts` | Run a foreground subagent |
-| `delegate` | `src/crow/tools.ts` | Run a background explore-only subagent |
+| `subagent` | `src/crow/tools.ts` | Run an agent in a child session (foreground default, background flag, sessionID follow-up) |
 | `computer_*` | `src/tools/computer.ts` | Desktop screenshot and input tools |
 
 ## Provider Runtime

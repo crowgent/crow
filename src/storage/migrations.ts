@@ -138,6 +138,7 @@ function createSessionRecapSchema(db: SQLiteDatabase): void {
   addColumnIfMissing(db, "sessions", "recap_text", "TEXT");
   addColumnIfMissing(db, "sessions", "recap_model", "TEXT");
   addColumnIfMissing(db, "sessions", "recap_updated_at", "TEXT");
+  addColumnIfMissing(db, "sessions", "parent_id", "TEXT");
 }
 
 function ensureLatestSchema(db: SQLiteDatabase): void {

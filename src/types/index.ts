@@ -50,13 +50,23 @@ export interface TaskRun {
   description: string;
   summary: string;
   activity?: string;
+  sessionId?: string;
+}
+
+export interface SubagentRequest {
+  agent: string;
+  description: string;
+  prompt: string;
+  model?: string;
+  sessionID?: string;
+  background?: boolean;
 }
 
 export type DelegationStatus = "running" | "complete" | "error";
 
 export interface DelegationRun {
   id: string;
-  agent: "explore";
+  agent: string;
   description: string;
   summary: string;
   status: DelegationStatus;
@@ -267,6 +277,7 @@ export interface WorkspaceInfo {
 export interface SessionInfo {
   id: string;
   workspaceId: string;
+  parentId: string | null;
   title: string | null;
   recap: SessionRecap | null;
   model: string;

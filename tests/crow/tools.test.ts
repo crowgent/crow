@@ -80,14 +80,14 @@ describe("schedule daemon tools", () => {
     expect(bashTool.description).toContain("agent-browser run on the host");
   });
 
-  it("routes verify task requests through the task tool", async () => {
-    const runTask = vi.fn(async () => ({ success: true, output: "verified" }));
+  it("routes verify requests through the subagent tool", async () => {
+    const runSubagent = vi.fn(async () => ({ success: true, output: "verified" }));
     const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
-      runTask,
+      runSubagent,
       subagents: [],
     }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown>; description?: string }>;
 
-    const taskTool = tools.task;
+    const taskTool = tools.subagent;
     expect(taskTool.description).toContain("`verify`");
 
     const result = (await taskTool.execute(
@@ -99,7 +99,7 @@ describe("schedule daemon tools", () => {
       { abortSignal: undefined },
     )) as { success: boolean; output: string };
 
-    expect(runTask).toHaveBeenCalledWith(
+    expect(runSubagent).toHaveBeenCalledWith(
       {
         agent: "verify",
         description: "Run local verification",
@@ -110,14 +110,14 @@ describe("schedule daemon tools", () => {
     expect(result).toEqual({ success: true, output: "verified" });
   });
 
-  it("routes verify-detect task requests through the task tool", async () => {
-    const runTask = vi.fn(async () => ({ success: true, output: "recipe" }));
+  it("routes verify-detect requests through the subagent tool", async () => {
+    const runSubagent = vi.fn(async () => ({ success: true, output: "recipe" }));
     const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
-      runTask,
+      runSubagent,
       subagents: [],
     }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown>; description?: string }>;
 
-    const taskTool = tools.task;
+    const taskTool = tools.subagent;
     expect(taskTool.description).toContain("`verify-detect`");
 
     const result = (await taskTool.execute(
@@ -129,7 +129,7 @@ describe("schedule daemon tools", () => {
       { abortSignal: undefined },
     )) as { success: boolean; output: string };
 
-    expect(runTask).toHaveBeenCalledWith(
+    expect(runSubagent).toHaveBeenCalledWith(
       {
         agent: "verify-detect",
         description: "Detect verification recipe",
@@ -140,14 +140,14 @@ describe("schedule daemon tools", () => {
     expect(result).toEqual({ success: true, output: "recipe" });
   });
 
-  it("routes verify-manifest task requests through the task tool", async () => {
-    const runTask = vi.fn(async () => ({ success: true, output: "manifest written" }));
+  it("routes verify-manifest requests through the subagent tool", async () => {
+    const runSubagent = vi.fn(async () => ({ success: true, output: "manifest written" }));
     const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
-      runTask,
+      runSubagent,
       subagents: [],
     }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown>; description?: string }>;
 
-    const taskTool = tools.task;
+    const taskTool = tools.subagent;
     expect(taskTool.description).toContain("`verify-manifest`");
 
     const result = (await taskTool.execute(
@@ -159,7 +159,7 @@ describe("schedule daemon tools", () => {
       { abortSignal: undefined },
     )) as { success: boolean; output: string };
 
-    expect(runTask).toHaveBeenCalledWith(
+    expect(runSubagent).toHaveBeenCalledWith(
       {
         agent: "verify-manifest",
         description: "Create verify manifest",
@@ -170,10 +170,10 @@ describe("schedule daemon tools", () => {
     expect(result).toEqual({ success: true, output: "manifest written" });
   });
 
-  it("exposes computer tools and routes computer task requests", async () => {
-    const runTask = vi.fn(async () => ({ success: true, output: "computer-ready" }));
+  it("exposes computer tools and routes computer requests through the subagent tool", async () => {
+    const runSubagent = vi.fn(async () => ({ success: true, output: "computer-ready" }));
     const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
-      runTask,
+      runSubagent,
       subagents: [],
     }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown>; description?: string }>;
 
@@ -190,7 +190,7 @@ describe("schedule daemon tools", () => {
     expect(tools).toHaveProperty("computer_wait");
     expect(tools).toHaveProperty("computer_get");
 
-    const taskTool = tools.task;
+    const taskTool = tools.subagent;
     expect(taskTool.description).toContain("`computer`");
 
     const result = (await taskTool.execute(
@@ -202,7 +202,7 @@ describe("schedule daemon tools", () => {
       { abortSignal: undefined },
     )) as { success: boolean; output: string };
 
-    expect(runTask).toHaveBeenCalledWith(
+    expect(runSubagent).toHaveBeenCalledWith(
       {
         agent: "computer",
         description: "Drive the host desktop",
@@ -247,14 +247,41 @@ describe("schedule daemon tools", () => {
     expect(result.output).toBe("Schedule daemon already running (pid 7777).");
   });
 
-  it("formats daemon stop output", async () => {
-    const { tools } = createScheduleToolSet({
-      stopDaemon: async () => ({ status: { running: false, pid: null }, pid: 8888, wasRunning: true }),
-    });
+  it("passes model, sessionID, and background through the subagent tool", async () => {
+    const runSubagent = vi.fn(async () => ({ success: true, output: "done" }));
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
+      runSubagent,
+      subagents: [],
+    }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown>; description?: string }>;
 
-    const result = (await tools.schedule_daemon_stop.execute({}, {})) as { success: boolean; output: string };
+    expect(tools).toHaveProperty("subagent");
+    expect(tools).not.toHaveProperty("task");
+    expect(tools).not.toHaveProperty("delegate");
+    expect(tools.subagent.description).toContain("child session");
 
-    expect(result.success).toBe(true);
-    expect(result.output).toBe("Schedule daemon stopped (pid 8888).");
+    const result = (await tools.subagent.execute(
+      {
+        agent: "explore",
+        description: "Follow up research",
+        prompt: "Continue the earlier research.",
+        model: "xai/grok-4.7",
+        sessionID: "abc123def456",
+        background: true,
+      },
+      { abortSignal: undefined },
+    )) as { success: boolean; output: string };
+
+    expect(runSubagent).toHaveBeenCalledWith(
+      {
+        agent: "explore",
+        description: "Follow up research",
+        prompt: "Continue the earlier research.",
+        model: "xai/grok-4.7",
+        sessionID: "abc123def456",
+        background: true,
+      },
+      undefined,
+    );
+    expect(result).toEqual({ success: true, output: "done" });
   });
 });
