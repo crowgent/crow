@@ -10,9 +10,9 @@ alwaysApply: false
 
 `Agent` (in `src/agent/agent.ts`) is the core orchestrator. It manages:
 
-- The Grok API client (`CrowClient`)
-- Bash tool for all shell operations
-- Web search and X search via the Responses API
+- The provider runtime (`createOpenAI` from `@ai-sdk/openai`, Chat Completions only)
+- File, bash, grep, computer, and subagent tools
+- Web search via the provider's web search tool
 - Chat history and message accumulation
 - Abort/cancellation support
 
@@ -44,16 +44,17 @@ Tools should never throw — wrap errors in `{ success: false, error: "..." }`.
 
 | Tool | File | Purpose |
 |------|------|---------|
-| `BashTool` | `src/tools/bash.ts` | Execute any shell command |
-| `search_web` | via `CrowClient.searchWeb()` | Web search using Responses API |
-| `search_x` | via `CrowClient.searchX()` | X/Twitter search using Responses API |
+| `bash` | `src/tools/bash.ts` | Execute any shell command |
+| `read_file` | `src/tools/file.ts` | Read file contents |
+| `grep` | `src/tools/grep.ts` | Ripgrep-backed content search |
+| `search_web` | via the provider's web search tool | Provider-side web search |
+| `task` | `src/crow/tools.ts` | Run a foreground subagent |
+| `delegate` | `src/crow/tools.ts` | Run a background explore-only subagent |
+| `computer_*` | `src/tools/computer.ts` | Desktop screenshot and input tools |
 
-## Crow Client
+## Provider Runtime
 
-`CrowClient` (in `src/crow/client.ts`) handles two API endpoints:
-
-- **Chat Completions** (`/v1/chat/completions`): Main agent loop with streaming and tool calling
-- **Responses API** (`/v1/responses`): X Search and Web Search with server-side tools
+`src/crow/client.ts` builds the provider runtime with `createOpenAI` and always calls Chat Completions (`/v1/chat/completions`) — never the Responses API. It also captures provider reasoning from the raw SSE stream, since the AI SDK drops `reasoning_content` in chat completions.
 
 ## Adding a New Tool
 

@@ -40,12 +40,11 @@ bun run start
 
 | Variable | Required | Description |
 |----|----|----|
-| `GROK_API_KEY` | Yes | API key for xAI Crow |
-| `GROK_BASE_URL` | No | Custom API endpoint (default: `https://api.x.ai/v1`) |
-| `GROK_MODEL` | No | Model override (default: `grok-4.3`) |
-| `GROK_MAX_TOKENS` | No | Max tokens per response (default: 16384) |
+| `CROW_PROVIDER` | No | Provider id override (e.g. `openai`, `gemini`, a custom provider id) |
+| `CROW_MODEL` | No | Model override |
+| `CROW_MAX_TOKENS` | No | Max tokens per response (default: 16384) |
 
-Copy `.env.example` to `.env` and fill in your values.
+Provider API keys are saved by `/connect` to `~/.crow/auth.json` (mode 600). This project does not load `.env` files.
 
 ## Git hooks
 
@@ -63,4 +62,4 @@ After `bun install`, **Husky** installs a **pre-commit** hook that runs **`lint-
 - Source code lives in `src/`, compiled output in `dist/` (gitignored).
 - The CLI entry point is `src/index.ts` which uses Commander.js for argument parsing.
 - UI is built with OpenTUI React (`@opentui/react`).
-- Only tool is bash — all file operations happen through shell commands.
+- Tools include file read/edit, bash, grep, computer control, MCP servers, LSP, and subagents.
