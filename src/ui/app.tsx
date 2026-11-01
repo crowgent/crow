@@ -109,17 +109,27 @@ import {
 import { getCompactTuiSelectionText } from "./terminal-selection-text";
 import { dark, type Theme } from "./theme";
 
-const STAR_PALETTE = ["#777777", "#666666", "#4a4a4a", "#333333", "#222222"];
-const LOADING_SPINNER_FRAMES = ["⬒", "⬔", "⬓", "⬕"];
-const PROMPT_LOADING_FRAMES = [
-  { active: 0, forward: true },
-  { active: 1, forward: true },
-  { active: 2, forward: true },
-  { active: 1, forward: false },
-] as const;
+const CROW_LOGO = [
+  " ██████╗██████╗  ██████╗ ██╗    ██╗",
+  "██╔════╝██╔══██╗██╔═══██╗██║    ██║",
+  "██║     ██████╔╝██║   ██║██║ █╗ ██║",
+  "██║     ██╔══██╗██║   ██║██║███╗██║",
+  "╚██████╗██║  ██║╚██████╔╝╚███╔███╔╝",
+  " ╚═════╝╚═╝  ╚═╝ ╚═════╝  ╚══╝╚══╝ ",
+];
 
-type Star = { col: number; ch: string };
-type Row = { stars: Star[]; crow?: number };
+function HeroLogo({ t }: { t: Theme }) {
+  return (
+    <box flexDirection="column" alignItems="center">
+      {CROW_LOGO.map((line) => (
+        <text key={line} fg={t.primary}>
+          {line}
+        </text>
+      ))}
+    </box>
+  );
+}
+
 type ContextStats = {
   contextWindow: number;
   usedTokens: number;
@@ -141,127 +151,6 @@ function getPasteBlockToken(block: Pick<PasteBlock, "id" | "lines" | "isImage">)
 function getFileMentionToken(block: FileMentionBlock): string {
   const name = block.path.split("/").pop() || block.path;
   return `[File: ${name}]`;
-}
-
-const HERO_ROWS: Row[] = [
-  {
-    stars: [
-      { col: 0, ch: "·" },
-      { col: 13, ch: "*" },
-      { col: 21, ch: "·" },
-      { col: 34, ch: "·" },
-    ],
-  },
-  {
-    stars: [
-      { col: 3, ch: "*" },
-      { col: 11, ch: "·" },
-      { col: 17, ch: "·" },
-      { col: 25, ch: "*" },
-    ],
-  },
-  {
-    stars: [
-      { col: 6, ch: "·" },
-      { col: 12, ch: "·" },
-      { col: 15, ch: "·" },
-      { col: 18, ch: "·" },
-      { col: 24, ch: "·" },
-    ],
-  },
-  {
-    stars: [
-      { col: 2, ch: "·" },
-      { col: 10, ch: "·" },
-      { col: 19, ch: "·" },
-      { col: 27, ch: "·" },
-    ],
-    crow: 13,
-  },
-  {
-    stars: [
-      { col: 6, ch: "·" },
-      { col: 12, ch: "·" },
-      { col: 15, ch: "·" },
-      { col: 18, ch: "·" },
-      { col: 24, ch: "·" },
-    ],
-  },
-  {
-    stars: [
-      { col: 3, ch: "·" },
-      { col: 11, ch: "*" },
-      { col: 17, ch: "·" },
-      { col: 25, ch: "·" },
-    ],
-  },
-  {
-    stars: [
-      { col: 0, ch: "*" },
-      { col: 13, ch: "·" },
-      { col: 21, ch: "*" },
-      { col: 34, ch: "·" },
-    ],
-  },
-];
-
-function HeroLogo({ t }: { t: Theme }) {
-  const [tick, setTick] = useState(0);
-  const starIdx = useRef(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setTick((n) => n + 1), 900);
-    return () => clearInterval(id);
-  }, []);
-
-  starIdx.current = 0;
-  const nextColor = () => {
-    const i = starIdx.current++;
-    return STAR_PALETTE[(i * 7 + tick * 3 + i * tick) % STAR_PALETTE.length];
-  };
-
-  return (
-    <box flexDirection="column" alignItems="center">
-      {HERO_ROWS.map((row, r) => {
-        const els: React.ReactNode[] = [];
-        let cursor = 0;
-
-        for (const star of row.stars) {
-          if (row.crow !== undefined && cursor <= row.crow && star.col > row.crow) {
-            els.push(" ".repeat(row.crow - cursor));
-            els.push(
-              <span key="crow" style={{ fg: t.primary }}>
-                {"Crow"}
-              </span>,
-            );
-            cursor = row.crow + 4;
-          }
-          const gap = star.col - cursor;
-          if (gap > 0) els.push(" ".repeat(gap));
-          els.push(
-            <span key={`s-${star.col}`} style={{ fg: nextColor() }}>
-              {star.ch}
-            </span>,
-          );
-          cursor = star.col + 1;
-        }
-
-        if (row.crow !== undefined && cursor <= row.crow) {
-          els.push(" ".repeat(row.crow - cursor));
-          els.push(
-            <span key="crow" style={{ fg: t.primary }}>
-              {"Crow"}
-            </span>,
-          );
-          cursor = row.crow + 4;
-        }
-
-        els.push(" ".repeat(Math.max(0, 35 - cursor)));
-        // biome-ignore lint/suspicious/noArrayIndexKey: static constant array that never reorders
-        return <text key={r}>{els}</text>;
-      })}
-    </box>
-  );
 }
 
 const SPLIT = {
@@ -4297,77 +4186,12 @@ function PromptBox({
   );
 }
 
-function PromptModeLabel({
-  t,
-  modeInfo,
-  isProcessing,
-}: {
-  t: Theme;
-  modeInfo: (typeof MODES)[number];
-  isProcessing: boolean;
-}) {
-  if (!isProcessing) {
-    return (
-      <text fg={modeInfo.color}>
-        <b>{modeInfo.label}</b>
-      </text>
-    );
-  }
-
-  return <PromptLoadingBoxes t={t} color={modeInfo.color} />;
-}
-
-function PromptLoadingBoxes({ t: _t, color }: { t: Theme; color: string }) {
-  const [frame, setFrame] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setFrame((n) => (n + 1) % PROMPT_LOADING_FRAMES.length), 120);
-    return () => clearInterval(id);
-  }, []);
-
-  const step = PROMPT_LOADING_FRAMES[frame] ?? PROMPT_LOADING_FRAMES[0];
-
+function PromptModeLabel({ modeInfo }: { t: Theme; modeInfo: (typeof MODES)[number]; isProcessing: boolean }) {
   return (
-    <text>
-      {[0, 1, 2].map((idx) => (
-        <span key={idx} style={{ fg: promptLoadingCellColor(color, idx, step.active, step.forward) }}>
-          {promptLoadingCellGlyph(idx, step.active, step.forward)}
-        </span>
-      ))}
+    <text fg={modeInfo.color}>
+      <b>{modeInfo.label}</b>
     </text>
   );
-}
-
-function promptLoadingCellGlyph(index: number, active: number, forward: boolean): string {
-  const distance = forward ? active - index : index - active;
-  return distance >= 0 && distance < 2 ? "■" : "⬝";
-}
-
-function promptLoadingCellColor(color: string, index: number, active: number, forward: boolean): string {
-  const distance = forward ? active - index : index - active;
-  if (distance === 0) return color;
-  if (distance === 1) return withAlpha(color, 0.72);
-  return withAlpha(color, 0.22);
-}
-
-function withAlpha(color: string, alpha: number): string {
-  const normalized = color.trim();
-  const hex = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-  if (!hex) return color;
-
-  const body = hex[1];
-  const expanded =
-    body.length === 3
-      ? body
-          .split("")
-          .map((ch) => ch + ch)
-          .join("")
-      : body;
-
-  const alphaHex = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
-    .toString(16)
-    .padStart(2, "0");
-  return `#${expanded}${alphaHex}`;
 }
 
 function CopyFlashBanner({ t, width }: { t: Theme; width: number }) {
@@ -5009,9 +4833,7 @@ function ShimmerText({ t, text }: { t: Theme; text: string }) {
   return (
     <box paddingLeft={3}>
       <text>
-        <span style={{ fg: t.textMuted }}>
-          <LoadingSpinner />
-        </span>
+        <span style={{ fg: t.textMuted }}>{"○"}</span>
         <span style={{ fg: t.textMuted }}> {text}</span>
       </text>
     </box>
@@ -5036,11 +4858,7 @@ function SubagentTaskLine({ t, agent, label, pending }: { t: Theme; agent: strin
   return (
     <box paddingLeft={3}>
       <text>
-        {pending ? (
-          <span style={{ fg: t.subagentAccent }}>
-            <LoadingSpinner />
-          </span>
-        ) : null}
+        {pending ? <span style={{ fg: t.subagentAccent }}>{"○"}</span> : null}
         {pending ? " " : ""}
         <span style={{ fg: t.subagentAccent }}>
           <b>{`${displayAgent}: ${displayLabel}`}</b>
@@ -5057,9 +4875,7 @@ function DelegationTaskLine({ t, label, pending, id }: { t: Theme; label: string
     <box paddingLeft={3}>
       <text>
         {pending ? (
-          <span style={{ fg: t.subagentAccent }}>
-            <LoadingSpinner />
-          </span>
+          <span style={{ fg: t.subagentAccent }}>{"○"}</span>
         ) : (
           <span style={{ fg: t.subagentAccent }}>{"◆"}</span>
         )}{" "}
@@ -5074,17 +4890,6 @@ function DelegationTaskLine({ t, label, pending, id }: { t: Theme; label: string
       </text>
     </box>
   );
-}
-
-function LoadingSpinner() {
-  const [frame, setFrame] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setFrame((n) => (n + 1) % LOADING_SPINNER_FRAMES.length), 120);
-    return () => clearInterval(id);
-  }, []);
-
-  return <>{LOADING_SPINNER_FRAMES[frame]}</>;
 }
 
 function SubagentActivity({ t, status }: { t: Theme; status: SubagentStatus }) {

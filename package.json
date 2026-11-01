@@ -1,7 +1,7 @@
 {
   "name": "crow",
   "version": "1.1.7",
-  "description": "An open-source AI coding agent powered by Grok, built with Bun and OpenTUI.",
+  "description": "An open-source AI coding agent with multiple providers, built with Bun and OpenTUI.",
   "type": "module",
   "main": "dist/index.js",
   "exports": {
@@ -40,7 +40,7 @@
     "terminal",
     "opentui"
   ],
-  "author": "Vibe Kit",
+  "author": "crowgent",
   "dependencies": {
     "@ai-sdk/mcp": "^1.0.25",
     "@ai-sdk/openai": "^3.0.135",
@@ -78,5 +78,6 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "preferGlobal": true
+  "preferGlobal": true,
+  "license": "MIT"
 }

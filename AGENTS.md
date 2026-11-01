@@ -27,4 +27,4 @@ Crow is a single-package TypeScript CLI tool — no databases, Docker, or backgr
 ### Environment
 
 - **Bun** must be installed (not pre-installed on Cloud VMs). The update script handles this.
-- `GROK_API_KEY` environment variable is required for API calls. Set it as a secret.
+- A provider must be selected for API calls (TUI `/connect`, or `CROW_PROVIDER` plus that provider's API key). Set keys as secrets.
