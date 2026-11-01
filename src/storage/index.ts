@@ -1,4 +1,5 @@
 export { getDatabasePath } from "./db";
+export { forkSession } from "./fork";
 export {
   clearInbox,
   clearTurnClaim,
@@ -16,6 +17,7 @@ export {
   upsertTurnDraft,
 } from "./recovery";
 export { SessionStore } from "./sessions";
+export { addTodo, clearTodos, listTodos, removeTodo, setTodoStatus, type TodoItem, type TodoStatus } from "./todos";
 export {
   appendCompaction,
   appendMessages,

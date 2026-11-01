@@ -1,4 +1,8 @@
-import { generateText, type ToolSet, tool } from "ai";
+import { randomUUID } from "node:crypto";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
+import { experimental_generateImage, generateText, type ToolSet, tool } from "ai";
 import { z } from "zod";
 import { executePostToolFailureHooks, executePostToolHooks, executePreToolHooks } from "../hooks/index";
 import { isLspToolEnabled, queryLsp } from "../lsp/runtime";
@@ -21,10 +25,33 @@ import {
 import { editFile, readFile, writeFile } from "../tools/file";
 import { executeGrep } from "../tools/grep";
 import type { ScheduleDaemonStatus, ScheduleManager, StoredSchedule } from "../tools/schedule";
+import { createSnapshot, listSnapshots, revertSnapshot } from "../tools/snapshot";
+import { createWorktree, listWorktrees, removeWorktree } from "../tools/worktree";
 import type { AgentMode, SubagentRequest, ToolResult } from "../types/index";
 import { type AgentDefinition, isDelegatable } from "../utils/agent-files";
 import { type CustomSubagentConfig, loadValidSubAgents } from "../utils/settings";
 import type { CrowProvider } from "./client";
+
+export interface QuestionItem {
+  question: string;
+  options: string[];
+}
+
+export type QuestionResolver = (questions: QuestionItem[], abortSignal?: AbortSignal) => Promise<string[]>;
+
+export interface TodoStoreItem {
+  id: number;
+  text: string;
+  status: "open" | "done";
+  createdAt: string;
+}
+
+export interface TodoStore {
+  list(sessionId: string): TodoStoreItem[];
+  add(sessionId: string, text: string): TodoStoreItem;
+  setStatus(sessionId: string, id: number, status: "open" | "done"): boolean;
+  remove(sessionId: string, id: number): boolean;
+}
 
 interface CreateToolsOptions {
   modelId?: string;
@@ -37,6 +64,8 @@ interface CreateToolsOptions {
   agentDefinitions?: AgentDefinition[];
   sendTelegramFile?: (filePath: string) => Promise<ToolResult>;
   sessionId?: string;
+  askQuestion?: QuestionResolver;
+  todos?: TodoStore;
 }
 
 export function createTools(
@@ -195,6 +224,210 @@ export function createTools(
       }),
       execute: async ({ query }, { abortSignal }) => {
         return runResponsesSearch(query, abortSignal);
+      },
+    }),
+
+    todo: tool({
+      description:
+        "Manage the session todo list. Use for tracking multi-step work: add items, list them, mark done, remove them.",
+      inputSchema: z.object({
+        operation: z.enum(["add", "list", "done", "remove"]),
+        text: z.string().optional().describe("Todo text, required for add"),
+        id: z.number().optional().describe("Todo id, required for done and remove"),
+      }),
+      execute: async ({ operation, text, id }) => {
+        if (!options.sessionId || !options.todos) return { success: false, output: "Todos need a persisted session." };
+        if (operation === "add") {
+          if (!text?.trim()) return { success: false, output: "Todo text is required." };
+          const item = options.todos.add(options.sessionId, text.trim());
+          return { success: true, output: `Added todo ${item.id}: ${item.text}` };
+        }
+        if (operation === "list") {
+          const items = options.todos.list(options.sessionId);
+          if (items.length === 0) return { success: true, output: "Todo list is empty." };
+          return {
+            success: true,
+            output: items.map((item) => `${item.id}. [${item.status === "done" ? "x" : " "}] ${item.text}`).join("\n"),
+          };
+        }
+        if (id == null) return { success: false, output: "Todo id is required." };
+        if (operation === "done") {
+          return options.todos.setStatus(options.sessionId, id, "done")
+            ? { success: true, output: `Todo ${id} marked done.` }
+            : { success: false, output: `Todo ${id} was not found.` };
+        }
+        return options.todos.remove(options.sessionId, id)
+          ? { success: true, output: `Todo ${id} removed.` }
+          : { success: false, output: `Todo ${id} was not found.` };
+      },
+    }),
+
+    fetch_url: tool({
+      description:
+        "Fetch a URL and return its readable text. HTML tags are stripped. Use for reading docs, articles, and pages the model needs.",
+      inputSchema: z.object({
+        url: z.string().describe("The URL to fetch"),
+      }),
+      execute: async ({ url }) => {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 30_000);
+          try {
+            const response = await fetch(url, { signal: controller.signal, redirect: "follow" });
+            if (!response.ok) return { success: false, output: `Fetch failed: HTTP ${response.status}.` };
+            const html = await response.text();
+            const text = html
+              .replace(/<script[\s\S]*?<\/script>/gi, " ")
+              .replace(/<style[\s\S]*?<\/style>/gi, " ")
+              .replace(/<[^>]+>/g, " ")
+              .replace(/&nbsp;/gi, " ")
+              .replace(/&amp;/gi, "&")
+              .replace(/&lt;/gi, "<")
+              .replace(/&gt;/gi, ">")
+              .replace(/&quot;/gi, '"')
+              .replace(/&#39;/g, "'")
+              .replace(/\s+/g, " ")
+              .trim();
+            return { success: true, output: text || "(page had no readable text)" };
+          } finally {
+            clearTimeout(timeout);
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { success: false, output: `Fetch failed: ${msg}` };
+        }
+      },
+    }),
+
+    question: tool({
+      description:
+        "Ask the user one or more multiple-choice questions and wait for their answers. Each question must include 2 or more options for the user to pick from. Use when a choice blocks progress. In unattended sessions this tool is unavailable.",
+      inputSchema: z.object({
+        questions: z
+          .array(
+            z.object({
+              question: z.string(),
+              options: z.array(z.string()).min(2),
+            }),
+          )
+          .min(1),
+      }),
+      execute: async ({ questions }) => {
+        if (!options.askQuestion) {
+          return {
+            success: false,
+            output: "Questions cannot be asked in this session (unattended). Proceed with your best judgment.",
+          };
+        }
+        try {
+          const answers = await options.askQuestion(questions);
+          if (answers.length === 0) return { success: false, output: "The user declined to answer." };
+          return {
+            success: true,
+            output: questions.map((item, i) => `Q: ${item.question}\nA: ${answers[i] ?? "(no answer)"}`).join("\n"),
+          };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { success: false, output: `Question failed: ${msg}` };
+        }
+      },
+    }),
+
+    worktree_create: tool({
+      description:
+        "Create a git worktree at a path, optionally on a new branch. The current directory must be a git repository.",
+      inputSchema: z.object({
+        path: z.string().describe("The worktree path to create"),
+        branch: z.string().optional().describe("A new branch name to create and check out in the worktree"),
+      }),
+      execute: async ({ path, branch }) => {
+        return createWorktree(cwd(), path, branch);
+      },
+    }),
+
+    worktree_list: tool({
+      description: "List git worktrees for the current repository.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        return listWorktrees(cwd());
+      },
+    }),
+
+    worktree_remove: tool({
+      description: "Remove a git worktree by path. This deletes the worktree directory.",
+      inputSchema: z.object({
+        path: z.string().describe("The worktree path to remove"),
+      }),
+      execute: async ({ path }) => {
+        return removeWorktree(cwd(), path);
+      },
+    }),
+
+    snapshot_create: tool({
+      description:
+        "Snapshot the current working directory (excluding .git, node_modules, and snapshots themselves) so it can be restored later.",
+      inputSchema: z.object({
+        name: z.string().optional().describe("A name for the snapshot"),
+      }),
+      execute: async ({ name }) => {
+        try {
+          const meta = await createSnapshot(cwd(), name);
+          return { success: true, output: `Snapshot created: ${meta.id} (${meta.name}).` };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { success: false, output: `Snapshot failed: ${msg}` };
+        }
+      },
+    }),
+
+    snapshot_list: tool({
+      description: "List saved workspace snapshots.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const snapshots = await listSnapshots();
+        if (snapshots.length === 0) return { success: true, output: "No snapshots." };
+        return {
+          success: true,
+          output: snapshots
+            .map((snapshot) => `${snapshot.id} (${snapshot.name}) from ${snapshot.sourceCwd} at ${snapshot.createdAt}`)
+            .join("\n"),
+        };
+      },
+    }),
+
+    snapshot_revert: tool({
+      description:
+        "Restore a snapshot over its original directory. Files created after the snapshot are left untouched.",
+      inputSchema: z.object({
+        id: z.string().describe("The snapshot id"),
+      }),
+      execute: async ({ id }) => {
+        return revertSnapshot(id);
+      },
+    }),
+
+    generate_image: tool({
+      description:
+        "Generate an image from a text prompt using an image-capable model from the configured provider. The model id must be an image model (for example gpt-image-1 on OpenAI). The image is saved as a PNG file and its path is returned.",
+      inputSchema: z.object({
+        prompt: z.string().describe("The image prompt"),
+        model: z.string().describe("The image model id"),
+      }),
+      execute: async ({ prompt, model }) => {
+        try {
+          const { image } = await experimental_generateImage({
+            model: provider.image(model),
+            prompt,
+          });
+          const dir = path.join(os.homedir(), ".crow", "images");
+          await fs.mkdir(dir, { recursive: true });
+          const file = path.join(dir, `${randomUUID().replace(/-/g, "").slice(0, 12)}.png`);
+          await fs.writeFile(file, Buffer.from(image.base64, "base64"));
+          return { success: true, output: `Image saved to ${file}` };
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { success: false, output: `Image generation failed: ${msg}` };
+        }
       },
     }),
   };

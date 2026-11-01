@@ -30,6 +30,8 @@ export const GATED_TOOLS: Record<string, ResourceExtractor> = {
   schedule_daemon_start: () => "",
   schedule_daemon_stop: () => "",
   telegram_send_file: stringField("path"),
+  snapshot_revert: stringField("id"),
+  worktree_remove: stringField("path"),
   computer_click: jsonInput,
   computer_type: jsonInput,
   computer_press: jsonInput,

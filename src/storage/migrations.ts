@@ -174,8 +174,19 @@ function ensureLatestSchema(db: SQLiteDatabase): void {
       created_at TEXT NOT NULL
     ) STRICT;
 
+    CREATE TABLE IF NOT EXISTS todos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      text TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+
     CREATE INDEX IF NOT EXISTS idx_inbox_session_id
       ON inbox(session_id, id);
+    CREATE INDEX IF NOT EXISTS idx_todos_session_id
+      ON todos(session_id, id);
   `);
 }
 
