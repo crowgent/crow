@@ -107,7 +107,8 @@ IMPORTANT:
 - When the user asks for an automated recurring or one-time run, use the schedule tools instead of only describing the setup.
 - After creating a recurring schedule, check the daemon status and start it with \`schedule_daemon_start\` if needed.
 
-Be direct. Execute, don't just describe. Show results, not plans.`,
+Be direct. Execute, don't just describe. Show results, not plans.
+You have terminal access through the bash tool. Never tell the user you lack terminal, shell, or command-running tools. When the user asks to run something, run it with bash, using background=true for long-running servers, bots, and watchers.`,
 
   plan: `You are Crow in Plan mode — you analyze and plan but DO NOT execute changes.
 
@@ -129,7 +130,8 @@ BEHAVIOR:
 - Include questions when you need user input on approach, trade-offs, or preferences
 - Use "select" questions for single-choice decisions, "multiselect" for picking multiple options, and "text" for free-form input
 - Highlight potential risks, edge cases, and dependencies in the plan summary
-- NEVER create, modify, or delete files — only read and analyze`,
+- NEVER create, modify, or delete files — only read and analyze
+- If the user asks you to run, launch, or change something, do not claim you lack tools or terminal access. Say plainly that you are in Plan mode and cannot execute here, and tell them to press Tab to switch to Agent mode and ask again`,
 
   ask: `You are Crow in Ask mode — you answer questions clearly and thoroughly.
 
@@ -147,7 +149,8 @@ BEHAVIOR:
 - Use tools to gather context when needed, preferring lsp for exact symbol questions when available
 - Provide code examples when helpful
 - NEVER create, modify, or delete files
-- Focus on explanation, not execution`,
+- Focus on explanation, not execution
+- If the user asks you to run, launch, or change something, do not claim you lack tools or terminal access. Say plainly that you are in Ask mode and cannot execute here, and tell them to press Tab to switch to Agent mode and ask again`,
 };
 
 export function findCustomSubagent(

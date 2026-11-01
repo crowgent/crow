@@ -1029,3 +1029,34 @@ function formatDaemonReminder(status: ScheduleDaemonStatus): string {
   }
   return "Daemon status: not running. Use `schedule_daemon_start` (or `crow daemon`) to run recurring schedules.";
 }
+
+const MUTATING_TOOL_NAMES = new Set([
+  "write_file",
+  "edit_file",
+  "process_stop",
+  "schedule_create",
+  "schedule_remove",
+  "schedule_daemon_start",
+  "schedule_daemon_stop",
+  "telegram_send_file",
+  "computer_click",
+  "computer_type",
+  "computer_press",
+  "computer_mouse_move",
+  "computer_scroll",
+  "computer_launch",
+  "snapshot_create",
+  "snapshot_revert",
+  "worktree_create",
+  "worktree_remove",
+  "generate_image",
+]);
+
+export function restrictToolsForMode(tools: ToolSet, mode: AgentMode): ToolSet {
+  if (mode === "agent") return tools;
+  const restricted: ToolSet = {};
+  for (const [name, tool] of Object.entries(tools)) {
+    if (!MUTATING_TOOL_NAMES.has(name)) restricted[name] = tool;
+  }
+  return restricted;
+}

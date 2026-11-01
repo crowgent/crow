@@ -6,7 +6,7 @@ import { withPermissionGate } from "../crow/permission-gate";
 import type { PermissionEffect, PermissionResolver } from "../crow/permissions";
 import { withToolOutputCap } from "../crow/tool-output-cap";
 import { toolSetToBatchTools } from "../crow/tool-schemas";
-import { createTools, type QuestionItem } from "../crow/tools";
+import { createTools, type QuestionItem, restrictToolsForMode } from "../crow/tools";
 import type { executeEventHooks } from "../hooks/index";
 import type {
   PostCompactHookInput,
@@ -239,6 +239,7 @@ async function* processMessageBatchTurn(
           yield { type: "content", content: `MCP unavailable: ${mcpBundle.errors.join(" | ")}\n\n` };
         }
       }
+      if (ctx.mode !== "agent") tools = restrictToolsForMode(tools, ctx.mode);
       tools = withToolOutputCap(tools, ctx.session?.id ?? undefined);
       tools = withPermissionGate(tools, {
         evaluate: ctx.evaluatePermission,
@@ -600,6 +601,7 @@ export async function* processMessage(
             yield { type: "content", content: `MCP unavailable: ${mcpBundle.errors.join(" | ")}\n\n` };
           }
         }
+        if (ctx.mode !== "agent") tools = restrictToolsForMode(tools, ctx.mode);
         tools = withToolOutputCap(tools, ctx.session?.id ?? undefined);
         tools = withPermissionGate(tools, {
           evaluate: ctx.evaluatePermission,
