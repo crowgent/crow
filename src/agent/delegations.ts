@@ -3,6 +3,8 @@ import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
+import type { executeEventHooks } from "../hooks/index";
+import type { TaskCompletedHookInput, TaskCreatedHookInput } from "../hooks/types";
 import type { DelegationRun, DelegationStatus, TaskRequest, ToolResult } from "../types/index";
 import { loadUserSettings, type SandboxMode, type SandboxSettings } from "../utils/settings";
 
@@ -47,6 +49,115 @@ interface StartDelegationOptions {
   maxToolRounds: number;
   maxTokens: number;
   batchApi?: boolean;
+}
+
+export interface DelegationContext {
+  delegations: DelegationManager;
+  modelId: string;
+  sandboxMode: SandboxMode;
+  sandboxSettings: SandboxSettings;
+  maxToolRounds: number;
+  maxTokens: number;
+  batchApi: boolean;
+  sessionId?: string;
+  cwd: string;
+  fireHook: (
+    input: Parameters<typeof executeEventHooks>[0],
+    signal?: AbortSignal,
+  ) => Promise<Awaited<ReturnType<typeof executeEventHooks>>>;
+}
+
+export async function runDelegation(
+  ctx: DelegationContext,
+  request: TaskRequest,
+  abortSignal?: AbortSignal,
+): Promise<ToolResult> {
+  const taskCreatedInput: TaskCreatedHookInput = {
+    hook_event_name: "TaskCreated",
+    agent_type: request.agent,
+    description: request.description,
+    session_id: ctx.sessionId,
+    cwd: ctx.cwd,
+  };
+  await ctx.fireHook(taskCreatedInput, abortSignal).catch(() => {});
+
+  let result: ToolResult;
+  try {
+    if (abortSignal?.aborted) {
+      return { success: false, output: "[Cancelled]" };
+    }
+
+    result = await ctx.delegations.start(request, {
+      model: ctx.modelId,
+      sandboxMode: ctx.sandboxMode,
+      sandboxSettings: ctx.sandboxSettings,
+      maxToolRounds: ctx.maxToolRounds,
+      maxTokens: ctx.maxTokens,
+      batchApi: ctx.batchApi,
+    });
+  } catch (err: unknown) {
+    if (abortSignal?.aborted) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    result = {
+      success: false,
+      output: `Delegation failed: ${msg}`,
+    };
+  }
+
+  const taskCompletedInput: TaskCompletedHookInput = {
+    hook_event_name: "TaskCompleted",
+    agent_type: request.agent,
+    description: request.description,
+    success: result.success,
+    session_id: ctx.sessionId,
+    cwd: ctx.cwd,
+  };
+  await ctx.fireHook(taskCompletedInput, abortSignal).catch(() => {});
+
+  return result;
+}
+
+export async function readDelegation(ctx: DelegationContext, id: string): Promise<ToolResult> {
+  try {
+    return {
+      success: true,
+      output: await ctx.delegations.read(id),
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      output: `Failed to read delegation: ${msg}`,
+    };
+  }
+}
+
+export async function listDelegations(ctx: DelegationContext): Promise<ToolResult> {
+  try {
+    const delegations = await ctx.delegations.list();
+    if (delegations.length === 0) {
+      return {
+        success: true,
+        output: "No delegations found for this project.",
+      };
+    }
+
+    const lines = delegations.map((delegation) => {
+      const title = delegation.description || delegation.id;
+      return `- \`${delegation.id}\` [${delegation.status}] ${title}\n  ${delegation.summary}`;
+    });
+
+    return {
+      success: true,
+      output: `## Delegations\n\n${lines.join("\n")}`,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      output: `Failed to list delegations: ${msg}`,
+    };
+  }
 }
 
 export class DelegationManager {

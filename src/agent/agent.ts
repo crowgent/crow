@@ -26,8 +26,6 @@ import type {
   SessionStartHookInput,
   StopFailureHookInput,
   StopHookInput,
-  TaskCompletedHookInput,
-  TaskCreatedHookInput,
   UserPromptSubmitHookInput,
 } from "../hooks/types";
 import { shutdownWorkspaceLspManager } from "../lsp/runtime";
@@ -104,7 +102,14 @@ import {
   relaxCompactionSettings,
   shouldCompactContext,
 } from "./compaction";
-import { DelegationManager } from "./delegations";
+import {
+  type DelegationContext,
+  DelegationManager,
+  listDelegations as listDelegationResults,
+  readDelegation as readDelegationResult,
+  runDelegation as runDelegationTask,
+} from "./delegations";
+
 import { humanizeApiError, isAuthenticationError, isContextLimitError } from "./errors";
 import { applyModelConstraints, buildSystemPrompt } from "./prompts";
 import { containsEncryptedReasoning, sanitizeModelMessages } from "./reasoning";
@@ -651,93 +656,31 @@ export class Agent {
     return runSubagentTask(this.subagentContext, request, abortSignal);
   }
 
+  private get delegationContext(): DelegationContext {
+    return {
+      delegations: this.delegations,
+      modelId: this.modelId,
+      sandboxMode: this.bash.getSandboxMode(),
+      sandboxSettings: this.bash.getSandboxSettings(),
+      maxToolRounds: this.maxToolRounds,
+      maxTokens: this.maxTokens,
+      batchApi: this.batchApi,
+      sessionId: this.session?.id,
+      cwd: this.bash.getCwd(),
+      fireHook: (input, signal) => this.fireHook(input, signal),
+    };
+  }
+
   private async runDelegation(request: TaskRequest, abortSignal?: AbortSignal): Promise<ToolResult> {
-    const taskCreatedInput: TaskCreatedHookInput = {
-      hook_event_name: "TaskCreated",
-      agent_type: request.agent,
-      description: request.description,
-      session_id: this.session?.id,
-      cwd: this.bash.getCwd(),
-    };
-    await this.fireHook(taskCreatedInput, abortSignal).catch(() => {});
-
-    let result: ToolResult;
-    try {
-      if (abortSignal?.aborted) {
-        return { success: false, output: "[Cancelled]" };
-      }
-
-      result = await this.delegations.start(request, {
-        model: this.modelId,
-        sandboxMode: this.bash.getSandboxMode(),
-        sandboxSettings: this.bash.getSandboxSettings(),
-        maxToolRounds: this.maxToolRounds,
-        maxTokens: this.maxTokens,
-        batchApi: this.batchApi,
-      });
-    } catch (err: unknown) {
-      if (abortSignal?.aborted) throw err;
-      const msg = err instanceof Error ? err.message : String(err);
-      result = {
-        success: false,
-        output: `Delegation failed: ${msg}`,
-      };
-    }
-
-    const taskCompletedInput: TaskCompletedHookInput = {
-      hook_event_name: "TaskCompleted",
-      agent_type: request.agent,
-      description: request.description,
-      success: result.success,
-      session_id: this.session?.id,
-      cwd: this.bash.getCwd(),
-    };
-    await this.fireHook(taskCompletedInput, abortSignal).catch(() => {});
-
-    return result;
+    return runDelegationTask(this.delegationContext, request, abortSignal);
   }
 
   private async readDelegation(id: string): Promise<ToolResult> {
-    try {
-      return {
-        success: true,
-        output: await this.delegations.read(id),
-      };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return {
-        success: false,
-        output: `Failed to read delegation: ${msg}`,
-      };
-    }
+    return readDelegationResult(this.delegationContext, id);
   }
 
   private async listDelegations(): Promise<ToolResult> {
-    try {
-      const delegations = await this.delegations.list();
-      if (delegations.length === 0) {
-        return {
-          success: true,
-          output: "No delegations found for this project.",
-        };
-      }
-
-      const lines = delegations.map((delegation) => {
-        const title = delegation.description || delegation.id;
-        return `- \`${delegation.id}\` [${delegation.status}] ${title}\n  ${delegation.summary}`;
-      });
-
-      return {
-        success: true,
-        output: `## Delegations\n\n${lines.join("\n")}`,
-      };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return {
-        success: false,
-        output: `Failed to list delegations: ${msg}`,
-      };
-    }
+    return listDelegationResults(this.delegationContext);
   }
 
   private getCompactionSettings(): CompactionSettings {
