@@ -3751,7 +3751,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               />
             </box>
           </box>
-          <box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="row" flexShrink={0}>
+          <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
             <text fg={t.textDim}>{agent.getCwd().replace(os.homedir(), "~")}</text>
             {sandboxMode === "shuru" ? <text fg="#f97316">{" · sandbox"}</text> : null}
             <box flexGrow={1} />
@@ -3817,7 +3817,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               </text>
             </box>
           )}
-          <box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="row" flexShrink={0}>
+          <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
             <text fg={t.textDim}>{agent.getCwd().replace(os.homedir(), "~")}</text>
             {sandboxMode === "shuru" ? <text fg="#f97316">{" · sandbox"}</text> : null}
             <box flexGrow={1} />
@@ -4138,95 +4138,97 @@ function PromptBox({
           paddingTop={1}
           paddingBottom={1}
           backgroundColor={t.backgroundElement}
-          flexDirection="row"
-          gap={2}
-          alignItems="flex-start"
+          flexDirection="column"
           flexShrink={0}
         >
-          <PromptModeLabel t={t} modeInfo={modeInfo} isProcessing={isProcessing} />
-          <box flexGrow={1}>
-            <textarea
-              ref={inputRef}
-              focused={
-                !showModelPicker &&
-                !showSandboxPicker &&
-                !showSlashMenu &&
-                !showPlanQuestions &&
-                !showProviderModal &&
-                !showAgentsModal &&
-                !showAgentsEditor &&
-                !blockPrompt
-              }
-              placeholder={isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Crow..."}
-              textColor={t.text}
-              backgroundColor={t.backgroundElement}
-              placeholderColor={t.textMuted}
-              minHeight={1}
-              maxHeight={10}
-              wrapMode="word"
-              keyBindings={TEXTAREA_KEYBINDINGS}
-              onSubmit={onSubmit as unknown as () => void}
-              onPaste={onPaste as unknown as (event: PasteEvent) => void}
-            />
+          <box flexDirection="row" gap={2} alignItems="flex-start">
+            <PromptModeLabel t={t} modeInfo={modeInfo} isProcessing={isProcessing} />
+            <box flexGrow={1}>
+              <textarea
+                ref={inputRef}
+                focused={
+                  !showModelPicker &&
+                  !showSandboxPicker &&
+                  !showSlashMenu &&
+                  !showPlanQuestions &&
+                  !showProviderModal &&
+                  !showAgentsModal &&
+                  !showAgentsEditor &&
+                  !blockPrompt
+                }
+                placeholder={
+                  isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Crow..."
+                }
+                textColor={t.text}
+                backgroundColor={t.backgroundElement}
+                placeholderColor={t.textMuted}
+                minHeight={1}
+                maxHeight={10}
+                wrapMode="word"
+                keyBindings={TEXTAREA_KEYBINDINGS}
+                onSubmit={onSubmit as unknown as () => void}
+                onPaste={onPaste as unknown as (event: PasteEvent) => void}
+              />
+            </box>
           </box>
-        </box>
-      </box>
-      <box
-        flexDirection="row"
-        justifyContent="space-between"
-        alignItems="center"
-        paddingLeft={2}
-        paddingRight={2}
-        height={1}
-        flexShrink={0}
-      >
-        <box flexDirection="row" gap={1} alignItems="center" height={1}>
-          <text fg={t.text}>{modelInfo?.name || model || "No provider selected"}</text>
-          {contextStats ? <ContextMeter t={t} stats={contextStats} /> : null}
-        </box>
-        <box flexDirection="row" gap={1} alignItems="center" height={1}>
-          {isProcessing ? (
-            <box flexDirection="row" gap={1}>
-              <text fg={t.text}>
-                {"enter "}
-                <span style={{ fg: t.textMuted }}>{"queue"}</span>
-              </text>
-              <text fg={t.text}>
-                {"esc "}
-                <span style={{ fg: t.textMuted }}>{(queuedCount ?? 0) > 0 ? "clear queue" : "interrupt"}</span>
-              </text>
+          <box
+            flexDirection="row"
+            justifyContent="space-between"
+            alignItems="center"
+            paddingTop={1}
+            height={1}
+            flexShrink={0}
+          >
+            <box flexDirection="row" gap={1} alignItems="center" height={1}>
+              {isProcessing ? <PromptActivitySpinner color={modeInfo.color} /> : null}
+              <text fg={t.text}>{modelInfo?.name || model || "No provider selected"}</text>
+              {contextStats ? <ContextMeter t={t} stats={contextStats} /> : null}
             </box>
-          ) : showSuggestions ? (
-            <box flexDirection="row" gap={1}>
-              <text fg={t.text}>
-                {"tab "}
-                <span style={{ fg: t.textMuted }}>{"accept"}</span>
-              </text>
-              <text fg={t.text}>
-                {"↑↓ "}
-                <span style={{ fg: t.textMuted }}>{"navigate"}</span>
-              </text>
-              <text fg={t.text}>
-                {"esc "}
-                <span style={{ fg: t.textMuted }}>{"dismiss"}</span>
-              </text>
+            <box flexDirection="row" gap={1} alignItems="center" height={1}>
+              {isProcessing ? (
+                <box flexDirection="row" gap={1}>
+                  <text fg={t.text}>
+                    {"enter "}
+                    <span style={{ fg: t.textMuted }}>{"queue"}</span>
+                  </text>
+                  <text fg={t.text}>
+                    {"esc "}
+                    <span style={{ fg: t.textMuted }}>{(queuedCount ?? 0) > 0 ? "clear queue" : "interrupt"}</span>
+                  </text>
+                </box>
+              ) : showSuggestions ? (
+                <box flexDirection="row" gap={1}>
+                  <text fg={t.text}>
+                    {"tab "}
+                    <span style={{ fg: t.textMuted }}>{"accept"}</span>
+                  </text>
+                  <text fg={t.text}>
+                    {"↑↓ "}
+                    <span style={{ fg: t.textMuted }}>{"navigate"}</span>
+                  </text>
+                  <text fg={t.text}>
+                    {"esc "}
+                    <span style={{ fg: t.textMuted }}>{"dismiss"}</span>
+                  </text>
+                </box>
+              ) : (
+                <>
+                  <text fg={t.text}>
+                    {"@ "}
+                    <span style={{ fg: t.textMuted }}>{"files"}</span>
+                  </text>
+                  <text fg={t.text}>
+                    {"shift+enter "}
+                    <span style={{ fg: t.textMuted }}>{"new line"}</span>
+                  </text>
+                  <text fg={t.text}>
+                    {"tab "}
+                    <span style={{ fg: t.textMuted }}>{"modes"}</span>
+                  </text>
+                </>
+              )}
             </box>
-          ) : (
-            <>
-              <text fg={t.text}>
-                {"@ "}
-                <span style={{ fg: t.textMuted }}>{"files"}</span>
-              </text>
-              <text fg={t.text}>
-                {"shift+enter "}
-                <span style={{ fg: t.textMuted }}>{"new line"}</span>
-              </text>
-              <text fg={t.text}>
-                {"tab "}
-                <span style={{ fg: t.textMuted }}>{"modes"}</span>
-              </text>
-            </>
-          )}
+          </box>
         </box>
       </box>
     </box>
@@ -4239,6 +4241,17 @@ function PromptModeLabel({ modeInfo }: { t: Theme; modeInfo: (typeof MODES)[numb
       <b>{modeInfo.label}</b>
     </text>
   );
+}
+
+const PROMPT_ACTIVITY_FRAMES = ["◐", "◓", "◑", "◒"];
+
+function PromptActivitySpinner({ color }: { color: string }) {
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => (f + 1) % PROMPT_ACTIVITY_FRAMES.length), 120);
+    return () => clearInterval(id);
+  }, []);
+  return <text fg={color}>{PROMPT_ACTIVITY_FRAMES[frame]}</text>;
 }
 
 function CopyFlashBanner({ t, width }: { t: Theme; width: number }) {
