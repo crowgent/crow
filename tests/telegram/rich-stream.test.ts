@@ -71,6 +71,36 @@ describe("runTelegramRichDraftReply", () => {
     });
     expect(reply).toHaveBeenCalledWith("hello");
   });
+
+  it("sends a 5000 character answer as one rich message, not splits", async () => {
+    fetchMock.mockResolvedValue(okResult({ message_id: 5 }));
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const text = "x".repeat(5000);
+    await runTelegramRichDraftReply({
+      ...baseArgs,
+      draftId: 99,
+      stream: contentStream([text]),
+      reply,
+    });
+    expect(calls().at(-1)).toMatchObject({
+      method: "sendRichMessage",
+      body: { rich_message: { markdown: text } },
+    });
+    expect(reply).not.toHaveBeenCalled();
+  });
+
+  it("falls back to plain splits past the rich limit", async () => {
+    fetchMock.mockResolvedValue(okResult({ message_id: 5 }));
+    const reply = vi.fn().mockResolvedValue(undefined);
+    await runTelegramRichDraftReply({
+      ...baseArgs,
+      draftId: 99,
+      stream: contentStream(["x".repeat(33000)]),
+      reply,
+    });
+    expect(reply).toHaveBeenCalledTimes(9);
+    expect(calls().some((call) => call.method === "sendRichMessage")).toBe(false);
+  });
 });
 
 describe("runTelegramEphemeralReply", () => {

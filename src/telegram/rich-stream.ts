@@ -1,6 +1,6 @@
 import type { Api } from "grammy";
 import type { StreamChunk } from "../types/index";
-import { splitTelegramMessage, TELEGRAM_MAX_MESSAGE } from "./limits";
+import { splitTelegramMessage, TELEGRAM_MAX_MESSAGE, TELEGRAM_RICH_MAX_MESSAGE } from "./limits";
 import { editEphemeralMessageText, sendRichMessage, sendRichMessageDraft } from "./rich-api";
 import { startTypingRefresh } from "./typing-refresh";
 
@@ -42,7 +42,7 @@ async function runStream(
     const delta = acc.length - lastPreviewLen;
     if (!force && now - lastPreviewAt < EDIT_THROTTLE_MS && delta < EDIT_MIN_CHARS) return;
     try {
-      await preview(acc.slice(0, TELEGRAM_MAX_MESSAGE));
+      await preview(acc.slice(0, TELEGRAM_RICH_MAX_MESSAGE));
       lastPreviewAt = Date.now();
       lastPreviewLen = acc.length;
     } catch {
@@ -93,7 +93,7 @@ export async function runTelegramRichDraftReply(args: TelegramRichStreamArgs & {
     } catch {}
   };
   const finalize = async (text: string) => {
-    if (text.length <= TELEGRAM_MAX_MESSAGE) {
+    if (text.length <= TELEGRAM_RICH_MAX_MESSAGE) {
       try {
         await sendRichMessage(args.token, target, text);
         return;
@@ -129,11 +129,11 @@ export async function runTelegramEphemeralReply(
         return;
       } catch {}
     }
-    if (text.length <= TELEGRAM_MAX_MESSAGE) {
+    if (text.length <= TELEGRAM_RICH_MAX_MESSAGE) {
       await sendRichMessage(args.token, target, text, args.receiverUserId);
       return;
     }
-    for (const part of splitTelegramMessage(text)) {
+    for (const part of splitTelegramMessage(text, TELEGRAM_RICH_MAX_MESSAGE)) {
       await sendRichMessage(args.token, target, part, args.receiverUserId);
     }
   };

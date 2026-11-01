@@ -2,7 +2,7 @@ import { Bot } from "grammy";
 import type { Agent } from "../agent/agent";
 import type { ToolCall, ToolResult } from "../types/index";
 import { loadUserSettings, resolveTelegramStreamSettings } from "../utils/settings";
-import { splitTelegramMessage, TELEGRAM_MAX_MESSAGE } from "./limits";
+import { splitTelegramMessage, TELEGRAM_MAX_MESSAGE, TELEGRAM_RICH_MAX_MESSAGE } from "./limits";
 import { registerPairingCode } from "./pairing";
 import { runTelegramPartialReply } from "./preview-stream";
 import { sendEphemeralText, sendRichMessage } from "./rich-api";
@@ -137,7 +137,7 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
           opts.onAssistantMessage?.({ turnKey, userId, content: trimmed, done: true });
           const isGroup = ctx.chat.type === "group" || ctx.chat.type === "supergroup";
           const isPrivate = ctx.chat.type === "private";
-          if (isPrivate && trimmed.length <= TELEGRAM_MAX_MESSAGE) {
+          if (isPrivate && trimmed.length <= TELEGRAM_RICH_MAX_MESSAGE) {
             try {
               await sendRichMessage(
                 opts.token,
@@ -149,7 +149,7 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
           }
           if (isGroup) {
             try {
-              if (trimmed.length <= TELEGRAM_MAX_MESSAGE) {
+              if (trimmed.length <= TELEGRAM_RICH_MAX_MESSAGE) {
                 await sendRichMessage(
                   opts.token,
                   { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
@@ -157,7 +157,7 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
                   userId,
                 );
               } else {
-                for (const part of splitTelegramMessage(trimmed)) {
+                for (const part of splitTelegramMessage(trimmed, TELEGRAM_RICH_MAX_MESSAGE)) {
                   await sendRichMessage(
                     opts.token,
                     { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
