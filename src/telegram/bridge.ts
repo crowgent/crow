@@ -2,7 +2,6 @@ import { Bot } from "grammy";
 import type { Agent } from "../agent/agent";
 import type { ToolCall, ToolResult } from "../types/index";
 import { loadUserSettings, resolveTelegramStreamSettings } from "../utils/settings";
-import { getTelegramAudioSource, transcribeTelegramAudioMessage } from "./audio-input";
 import { splitTelegramMessage, TELEGRAM_MAX_MESSAGE } from "./limits";
 import { registerPairingCode } from "./pairing";
 import { runTelegramPartialReply } from "./preview-stream";
@@ -190,23 +189,7 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
   }) => {
     const userId = await ensureApprovedUser(ctx);
     if (userId === null) return;
-
-    const source = getTelegramAudioSource(ctx.message);
-    if (!source) return;
-
-    try {
-      await bot.api.sendChatAction(ctx.chat.id, "typing");
-      const transcription = await transcribeTelegramAudioMessage({
-        api: bot.api,
-        token: opts.token,
-        source,
-        telegramSettings: loadUserSettings().telegram,
-      });
-      await runAgentTurn(ctx, userId, transcription.userContent, transcription.promptText);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      await replyTurnError(ctx, userId, `Audio transcription failed: ${msg}`);
-    }
+    await ctx.reply("Voice and audio messages are not supported in this build. Please send text.");
   };
 
   bot.command("start", async (ctx) => {

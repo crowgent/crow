@@ -14,13 +14,13 @@ import {
   pollBatchRequestResult,
 } from "../crow/batch";
 import {
+  type CrowProvider,
   createProvider,
   generateRecap as genRecap,
   generateTitle as genTitle,
   resolveModelRuntime,
-  type XaiProvider,
 } from "../crow/client";
-import { DEFAULT_MODEL, getModelInfo, normalizeModelId } from "../crow/models";
+import { getModelInfo, normalizeModelId } from "../crow/models";
 import { toolSetToBatchTools } from "../crow/tool-schemas";
 import { createTools } from "../crow/tools";
 import { executeEventHooks } from "../hooks/index";
@@ -100,8 +100,6 @@ import { containsEncryptedReasoning, sanitizeModelMessages } from "./reasoning";
 import { buildVisionUserMessages } from "./vision-input";
 
 const MAX_TOOL_ROUNDS = 400;
-const VISION_MODEL = "grok-4.3";
-const COMPUTER_MODEL = "grok-4.3";
 
 interface AgentOptions {
   persistSession?: boolean;
@@ -109,6 +107,7 @@ interface AgentOptions {
   sandboxMode?: SandboxMode;
   sandboxSettings?: SandboxSettings;
   batchApi?: boolean;
+  providerId?: string;
 }
 
 type ProcessMessageFinishReason = "stop" | "length" | "content-filter" | "tool-calls" | "error" | "other";
@@ -196,9 +195,6 @@ TOOLS:
 - schedule_daemon_start: Start the schedule daemon in the background.
 - schedule_daemon_stop: Stop the schedule daemon.
 - search_web: Search the web for current information, documentation, APIs, tutorials, etc.
-- search_x: Search X/Twitter for real-time posts, discussions, opinions, and trends.
-- generate_image: Generate a new image or edit an existing image. It saves image files locally and returns their paths.
-- generate_video: Generate a new video or animate an existing image. It saves video files locally and returns their paths.
 - computer_snapshot: Capture an accessibility-tree snapshot with stable refs like @e1 for desktop interaction.
 - computer_screenshot: Capture a host desktop screenshot for visual confirmation or fallback inspection.
 - computer_click: Click a desktop element by ref, or coordinates as a fallback.
@@ -533,7 +529,8 @@ function applyModelConstraints(system: string, modelId: string): string {
 }
 
 export class Agent {
-  private provider: XaiProvider | null = null;
+  private provider: CrowProvider | null = null;
+  private providerId: string | null = null;
   private apiKey: string | null = null;
   private baseURL: string | null = null;
   private bash: BashTool;
@@ -567,6 +564,9 @@ export class Agent {
     if (apiKey) {
       this.setApiKey(apiKey, baseURL);
     }
+    if (options.providerId) {
+      this.providerId = options.providerId;
+    }
     this.bash = new BashTool(process.cwd(), {
       sandboxMode: options.sandboxMode ?? "off",
       sandboxSettings: options.sandboxSettings,
@@ -580,7 +580,7 @@ export class Agent {
       () => this.modelId,
     );
     this.maxToolRounds = maxToolRounds || MAX_TOOL_ROUNDS;
-    const envMax = Number(process.env.GROK_MAX_TOKENS);
+    const envMax = Number(process.env.CROW_MAX_TOKENS);
     this.maxTokens = Number.isFinite(envMax) && envMax > 0 ? envMax : 16_384;
     this.batchApi = options.batchApi ?? false;
     this.recapsEnabled = loadRecapsEnabled();
@@ -662,6 +662,16 @@ export class Agent {
     this.provider = createProvider(apiKey, baseURL);
   }
 
+  setProvider(providerId: string, apiKey: string, baseURL: string, modelId?: string): void {
+    this.providerId = providerId;
+    this.setApiKey(apiKey, baseURL);
+    if (modelId) this.setModel(modelId);
+  }
+
+  getProviderId(): string | null {
+    return this.providerId;
+  }
+
   getCwd(): string {
     return this.bash.getCwd();
   }
@@ -715,7 +725,7 @@ export class Agent {
       return "New session";
     }
 
-    const generated = await genTitle(provider, userMessage);
+    const generated = await genTitle(provider, userMessage, this.modelId);
     this.recordUsage(generated.usage, "title", generated.modelId);
     if (this.sessionStore && this.session && !this.session.title && generated.title) {
       this.sessionStore.setTitle(this.session.id, generated.title);
@@ -880,7 +890,7 @@ export class Agent {
         return;
       }
 
-      const generated = await genRecap(this.provider, prompt, withAbortTimeout(signal, 8_000));
+      const generated = await genRecap(this.provider, prompt, withAbortTimeout(signal, 8_000), this.modelId);
       this.recordUsage(generated.usage, "recap", generated.modelId);
       if (!generated.recap) {
         return;
@@ -1078,7 +1088,7 @@ export class Agent {
                   childRuntime.modelInfo?.supportsMaxOutputTokens === false
                     ? undefined
                     : Math.min(this.maxTokens, 8_192),
-                reasoningEffort: childRuntime.providerOptions?.xai.reasoningEffort,
+                reasoningEffort: undefined,
                 tools: batchTools,
               }),
             },
@@ -1231,7 +1241,11 @@ export class Agent {
         ? (verifyPreparedSettings ?? { ...this.bash.getSandboxSettings(), ...verifySandboxOverrides })
         : this.bash.getSandboxSettings(),
     });
-    const childBaseTools = createTools(childBash, provider, childMode);
+    const childModelId = normalizeModelId(custom ? custom.model : this.modelId);
+    const childBaseTools = createTools(childBash, provider, childMode, {
+      modelId: childModelId,
+      providerId: this.providerId ?? undefined,
+    });
     const initialDetail = isExplore
       ? "Scanning the codebase"
       : isVerifyDetect
@@ -1247,20 +1261,7 @@ export class Agent {
     let lastActivity = initialDetail;
     let childTools: ToolSet = childBaseTools;
     let closeMcp: (() => Promise<void>) | undefined;
-    const childModelId = normalizeModelId(
-      isVision
-        ? VISION_MODEL
-        : isComputer
-          ? COMPUTER_MODEL
-          : isExplore
-            ? DEFAULT_MODEL
-            : custom
-              ? custom.model
-              : this.modelId,
-    );
-    const childRuntime = isVision
-      ? { ...resolveModelRuntime(provider, childModelId), model: provider.responses(childModelId) }
-      : resolveModelRuntime(provider, childModelId);
+    const childRuntime = resolveModelRuntime(provider, childModelId);
     if (isComputer && childRuntime.modelInfo?.supportsClientTools === false) {
       return {
         success: false,
@@ -1529,7 +1530,7 @@ export class Agent {
   }
 
   private async compactForContext(
-    provider: XaiProvider,
+    provider: CrowProvider,
     system: string,
     contextWindow: number,
     signal: AbortSignal,
@@ -1575,7 +1576,7 @@ export class Agent {
   private async *processMessageBatchTurn(args: {
     userModelMessage: ModelMessage;
     observer?: ProcessMessageObserver;
-    provider: XaiProvider;
+    provider: CrowProvider;
     subagents: CustomSubagentConfig[];
     system: string;
     runtime: ReturnType<typeof resolveModelRuntime>;
@@ -1610,6 +1611,8 @@ export class Agent {
         }
 
         const baseTools = createTools(this.bash, provider, this.mode, {
+          modelId: this.modelId,
+          providerId: this.providerId ?? undefined,
           runTask: (request, abortSignal) => this.runTask(request, combineAbortSignals(signal, abortSignal)),
           runDelegation: (request, abortSignal) =>
             this.runDelegation(request, combineAbortSignals(signal, abortSignal)),
@@ -1657,7 +1660,7 @@ export class Agent {
                     messages: [...this.messages, ...turnMessages],
                     temperature: 0.7,
                     maxOutputTokens: runtime.modelInfo?.supportsMaxOutputTokens === false ? undefined : this.maxTokens,
-                    reasoningEffort: runtime.providerOptions?.xai.reasoningEffort,
+                    reasoningEffort: undefined,
                     tools: batchTools,
                   }),
                 },
@@ -1919,6 +1922,8 @@ export class Agent {
           }
 
           const baseTools = createTools(this.bash, provider, this.mode, {
+            modelId: this.modelId,
+            providerId: this.providerId ?? undefined,
             runTask: (request, abortSignal) => this.runTask(request, combineAbortSignals(signal, abortSignal)),
             runDelegation: (request, abortSignal) =>
               this.runDelegation(request, combineAbortSignals(signal, abortSignal)),
@@ -2207,9 +2212,9 @@ export class Agent {
     }
   }
 
-  private requireProvider(): XaiProvider {
+  private requireProvider(): CrowProvider {
     if (!this.provider) {
-      throw new Error("API key required. Add an API key to continue.");
+      throw new Error("You have not selected a provider yet. Use /connect to choose a provider first.");
     }
 
     return this.provider;

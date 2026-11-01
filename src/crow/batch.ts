@@ -1,6 +1,4 @@
-import process from "node:process";
-
-const DEFAULT_BASE_URL = "https://api.x.ai/v1";
+const DEFAULT_BASE_URL = "";
 const DEFAULT_INITIAL_POLL_MS = 2_000;
 const DEFAULT_MAX_POLL_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
@@ -353,7 +351,7 @@ async function readJson<T>(response: Response): Promise<T> {
 }
 
 function normalizeBaseUrl(baseURL?: string): string {
-  return (baseURL || process.env.GROK_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  return (baseURL || DEFAULT_BASE_URL).replace(/\/+$/, "");
 }
 
 function getRetryAfterMs(response: Response): number | undefined {

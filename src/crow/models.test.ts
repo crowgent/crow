@@ -3,46 +3,40 @@ import {
   DEFAULT_MODEL,
   getEffectiveReasoningEffort,
   getModelInfo,
+  getModelsForProvider,
   getSupportedReasoningEfforts,
   normalizeModelId,
 } from "./models";
 
 describe("models", () => {
-  it("keeps the default model on a canonical reasoning id", () => {
-    expect(DEFAULT_MODEL).toBe("grok-4.3");
+  it("keeps the default model on a built-in provider model", () => {
+    expect(DEFAULT_MODEL).toBe("gpt-5");
   });
 
-  it("normalizes aliases to canonical ids", () => {
-    expect(normalizeModelId("grok-4-1-fast")).toBe("grok-4.3");
-    expect(normalizeModelId("xai/grok-code-fast-1")).toBe("grok-4.3");
-    expect(normalizeModelId("grok-4.20-0309-non-reasoning")).toBe("grok-4.20-non-reasoning");
-    expect(normalizeModelId("x-ai/grok-3")).toBe("grok-4.20-non-reasoning");
-    expect(normalizeModelId("grok-4.20-multi-agent")).toBe("grok-4.20-multi-agent-0309");
-    expect(normalizeModelId("x-ai/grok-4.20-multi-agent-beta")).toBe("grok-4.20-multi-agent-0309");
+  it("trims model ids without rewriting provider ids", () => {
+    expect(normalizeModelId("  gpt-5  ")).toBe("gpt-5");
+    expect(normalizeModelId("openai/gpt-oss-120b")).toBe("openai/gpt-oss-120b");
+    expect(normalizeModelId("deepseek-chat")).toBe("deepseek-chat");
   });
 
-  it("returns model metadata for aliased ids", () => {
-    expect(getModelInfo("grok-4-1-fast")?.id).toBe("grok-4.3");
-    expect(getModelInfo("grok-4.20-multi-agent")?.responsesOnly).toBe(true);
-    expect(getModelInfo("grok-4.20-multi-agent")?.supportsClientTools).toBe(false);
+  it("returns model metadata for built-in models", () => {
+    expect(getModelInfo("gpt-5")?.id).toBe("gpt-5");
+    expect(getModelInfo("gpt-5")?.provider).toBe("openai");
+    expect(getModelInfo("deepseek-reasoner")?.provider).toBe("deepseek");
   });
 
-  it("reports supported reasoning-effort levels", () => {
-    expect(getSupportedReasoningEfforts("grok-3-mini")).toEqual(["low", "high"]);
-    expect(getSupportedReasoningEfforts("grok-4.20-multi-agent-0309")).toEqual([]);
-    expect(getSupportedReasoningEfforts("grok-4.3")).toEqual([]);
-    expect(getSupportedReasoningEfforts("grok-4.20-non-reasoning")).toEqual([]);
-    expect(getSupportedReasoningEfforts("grok-code-fast-1")).toEqual([]);
-    expect(getSupportedReasoningEfforts("grok-3")).toEqual([]);
+  it("lists models per provider", () => {
+    expect(getModelsForProvider("openai").map((model) => model.id)).toContain("gpt-5");
+    expect(getModelsForProvider("deepseek").map((model) => model.id)).toEqual(["deepseek-chat", "deepseek-reasoner"]);
   });
 
-  it("resolves effective reasoning effort with defaults and overrides", () => {
-    expect(getEffectiveReasoningEffort("grok-3-mini")).toBeUndefined();
-    expect(getEffectiveReasoningEffort("grok-3-mini", "high")).toBe("high");
-    expect(getEffectiveReasoningEffort("grok-3-mini", "low")).toBe("low");
-    expect(getEffectiveReasoningEffort("grok-4.20-multi-agent-0309")).toBeUndefined();
-    expect(getEffectiveReasoningEffort("grok-4.20-multi-agent-0309", "high")).toBeUndefined();
-    expect(getEffectiveReasoningEffort("grok-4.3")).toBeUndefined();
-    expect(getEffectiveReasoningEffort("grok-code-fast-1", "high")).toBeUndefined();
+  it("reports no supported reasoning-effort levels", () => {
+    expect(getSupportedReasoningEfforts("gpt-5")).toEqual([]);
+    expect(getSupportedReasoningEfforts("deepseek-reasoner")).toEqual([]);
+  });
+
+  it("resolves no effective reasoning effort", () => {
+    expect(getEffectiveReasoningEffort("gpt-5")).toBeUndefined();
+    expect(getEffectiveReasoningEffort("gpt-5", "high")).toBeUndefined();
   });
 });

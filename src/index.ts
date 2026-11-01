@@ -5,7 +5,7 @@ import readline from "readline";
 import packageJson from "../package.json";
 import { Agent } from "./agent/agent";
 import { completeDelegation, failDelegation, loadDelegation } from "./agent/delegations";
-import { MODELS, normalizeModelId } from "./crow/models";
+import { normalizeModelId } from "./crow/models";
 import {
   createHeadlessJsonlEmitter,
   type HeadlessOutputFormat,
@@ -17,17 +17,22 @@ import { runTelegramHeadlessBridge } from "./telegram/headless-bridge";
 import { startScheduleDaemon } from "./tools/schedule";
 import { processAtMentions } from "./utils/at-mentions.js";
 import { runScriptManagedUninstall } from "./utils/install-manager";
+import { findProvider, getAllProviders } from "./utils/providers";
 import {
-  getApiKey,
-  getBaseURL,
+  getCurrentModel,
   getCurrentSandboxMode,
   getCurrentSandboxSettings,
+  getSelectedProvider,
+  getSelectedProviderId,
+  loadCustomProviders,
   loadPaymentSettings,
   mergeSandboxSettings,
   type SandboxMode,
   type SandboxSettings,
   savePaymentSettings,
+  saveProviderApiKey,
   saveUserSettings,
+  selectProvider,
 } from "./utils/settings";
 import { runUpdate } from "./utils/update-checker";
 import {
@@ -60,6 +65,7 @@ async function startInteractive(
   apiKey: string | undefined,
   baseURL: string,
   model: string | undefined,
+  providerId: string | undefined,
   maxToolRounds: number,
   batchApi: boolean,
   sandboxMode: SandboxMode,
@@ -67,7 +73,13 @@ async function startInteractive(
   session?: string,
   initialMessage?: string,
 ) {
-  const agent = new Agent(apiKey, baseURL, model, maxToolRounds, { session, sandboxMode, sandboxSettings, batchApi });
+  const agent = new Agent(apiKey, baseURL, model, maxToolRounds, {
+    session,
+    sandboxMode,
+    sandboxSettings,
+    batchApi,
+    providerId,
+  });
   const { createCliRenderer } = await import("@opentui/core");
   const { createRoot } = await import("@opentui/react");
   const { createElement } = await import("react");
@@ -254,12 +266,13 @@ async function runBackgroundDelegation(jobPath: string, options: CliOptions) {
 
   try {
     const delegation = await loadDelegation(jobPath);
-    const apiKey = stringOption(options.apiKey) || getApiKey();
+    const config = resolveConfig(options);
+    const apiKey = config.apiKey;
     if (!apiKey) {
-      throw new Error("API key required. Set GROK_API_KEY, use --api-key, or save it to ~/.crow/user-settings.json.");
+      throw new Error("No provider selected. Use /connect in the TUI to choose a provider first.");
     }
 
-    const baseURL = stringOption(options.baseUrl) || getBaseURL();
+    const baseURL = config.baseURL;
     const explicitModel = stringOption(options.model) || delegation.model;
     const model = explicitModel ? normalizeModelId(explicitModel) : undefined;
     const maxToolRounds =
@@ -271,6 +284,7 @@ async function runBackgroundDelegation(jobPath: string, options: CliOptions) {
       sandboxMode,
       sandboxSettings,
       batchApi: Boolean(delegation.batchApi ?? options.batchApi === true),
+      providerId: config.providerId,
     });
     const result = await agent.runTaskRequest({
       agent: delegation.agent,
@@ -300,10 +314,17 @@ async function runBackgroundDelegation(jobPath: string, options: CliOptions) {
 }
 
 function resolveConfig(options: CliOptions) {
-  const apiKey = stringOption(options.apiKey) || getApiKey();
-  const baseURL = stringOption(options.baseUrl) || getBaseURL();
+  const providerOption = stringOption(options.provider);
+  if (providerOption) {
+    const provider = findProvider(providerOption, loadCustomProviders());
+    if (provider) selectProvider(provider.id);
+  }
+  const selected = getSelectedProvider();
+  const providerId = selected?.provider.id ?? providerOption;
+  const apiKey = stringOption(options.apiKey) || selected?.apiKey;
+  const baseURL = stringOption(options.baseUrl) || selected?.provider.baseUrl || "";
   const explicitModel = stringOption(options.model);
-  const model = explicitModel ? normalizeModelId(explicitModel) : undefined;
+  const model = explicitModel ? normalizeModelId(explicitModel) : selected?.modelId || getCurrentModel() || undefined;
   const maxToolRounds = parseInt(stringOption(options.maxToolRounds) || "400", 10) || 400;
   const sandboxMode = resolveCliSandboxMode(options.sandbox) || getCurrentSandboxMode();
 
@@ -320,16 +341,16 @@ function resolveConfig(options: CliOptions) {
   }
   const sandboxSettings = mergeSandboxSettings(getCurrentSandboxSettings(), cliOverrides);
 
-  if (typeof options.apiKey === "string") saveUserSettings({ apiKey: options.apiKey });
+  if (typeof options.apiKey === "string" && providerId) saveProviderApiKey(providerId, options.apiKey);
   if (typeof options.model === "string") saveUserSettings({ defaultModel: normalizeModelId(options.model) });
 
-  return { apiKey, baseURL, model, maxToolRounds, sandboxMode, sandboxSettings };
+  return { apiKey, baseURL, model, maxToolRounds, sandboxMode, sandboxSettings, providerId };
 }
 
 function requireApiKey(apiKey: string | undefined): string {
   if (!apiKey) {
     console.error(
-      "Error: API key required. Set GROK_API_KEY env var, use --api-key, or save to ~/.crow/user-settings.json",
+      "Error: No provider selected. Use /connect in the TUI to choose a provider, or set CROW_PROVIDER and a provider API key.",
     );
     process.exit(1);
   }
@@ -347,10 +368,11 @@ function parseHeadlessOutputFormat(value: string): HeadlessOutputFormat {
 
 program
   .name("crow")
-  .description("AI coding agent powered by Grok — built with Bun and OpenTUI")
+  .description("AI coding agent with multiple providers — built with Bun and OpenTUI")
   .version(packageJson.version)
   .argument("[message...]", "Initial message to send")
-  .option("-k, --api-key <key>", "Grok API key")
+  .option("-k, --api-key <key>", "API key for the selected provider")
+  .option("--provider <id>", "Provider to use (for example openai, deepseek, qwen)")
   .option("-u, --base-url <url>", "API base URL")
   .option("-m, --model <model>", "Model to use")
   .option("-d, --directory <dir>", "Working directory", process.cwd())
@@ -365,7 +387,7 @@ program
   .option("-s, --session <id>", "Continue a saved session by id, or use 'latest'")
   .option("--background-task-file <path>", "Run a persisted background delegation")
   .option("--max-tool-rounds <n>", "Max tool execution rounds", "400")
-  .option("--batch-api", "Use xAI Batch API for model calls (async, lower cost)")
+  .option("--batch-api", "Use batch API for model calls (async, lower cost)")
   .option("--update", "Update crow to the latest version and exit")
   .action(async (message: string[], options) => {
     if (options.update) {
@@ -428,6 +450,7 @@ program
       config.apiKey,
       config.baseURL,
       config.model,
+      config.providerId,
       config.maxToolRounds,
       options.batchApi === true,
       config.sandboxMode,
@@ -440,7 +463,8 @@ program
 program
   .command("telegram-bridge")
   .description("Start the Telegram remote-control bridge without opening the TUI")
-  .option("-k, --api-key <key>", "Grok API key")
+  .option("-k, --api-key <key>", "API key for the selected provider")
+  .option("--provider <id>", "Provider to use (for example openai, deepseek, qwen)")
   .option("-u, --base-url <url>", "API base URL")
   .option("-m, --model <model>", "Model to use")
   .option("-d, --directory <dir>", "Working directory", process.cwd())
@@ -472,22 +496,44 @@ program
 
 program
   .command("models")
-  .description("List available Grok models")
-  .action(() => {
-    console.log("\nAvailable Grok Models:\n");
-    for (const m of MODELS) {
-      const tags = [
-        m.reasoning ? "reasoning" : "non-reasoning",
-        m.multiAgent ? "multi-agent" : null,
-        m.responsesOnly ? "responses-only" : null,
-      ].filter(Boolean);
-      const suffix = tags.length > 0 ? ` (${tags.join(", ")})` : "";
-      console.log(`  \x1b[36m${m.id}\x1b[0m — ${m.name}${suffix}`);
-      console.log(
-        `    ${m.description} | ${formatContext(m.contextWindow)} context | $${m.inputPrice}/$${m.outputPrice} per 1M tokens`,
-      );
-      if ((m.aliases?.length ?? 0) > 0) {
-        console.log(`    aliases: ${(m.aliases ?? []).join(", ")}`);
+  .description("List available models for the selected provider, or all providers when none is selected")
+  .option("--provider <id>", "Provider to list models for")
+  .action((options, command) => {
+    const providerArg =
+      typeof options.provider === "string"
+        ? options.provider
+        : typeof command?.opts?.()?.provider === "string"
+          ? command.opts().provider
+          : typeof program.opts().provider === "string"
+            ? program.opts().provider
+            : undefined;
+    if (providerArg) {
+      const provider = findProvider(providerArg, loadCustomProviders());
+      if (provider) {
+        selectProvider(provider.id);
+      } else {
+        console.log(`\nUnknown provider: ${providerArg}. Open the TUI and use /connect to choose a provider.`);
+        return;
+      }
+    }
+    const selected = getSelectedProvider();
+    const selectedId = selected?.provider.id ?? getSelectedProviderId();
+    const selectedProvider =
+      selected?.provider ?? (selectedId ? findProvider(selectedId, loadCustomProviders()) : undefined);
+    const providers = selectedProvider ? [selectedProvider] : getAllProviders(loadCustomProviders());
+    for (const provider of providers) {
+      console.log(`\n${provider.name} (${provider.id}) — ${provider.baseUrl}\n`);
+      for (const m of provider.models) {
+        console.log(`  ${m.id} — ${m.name}`);
+      }
+    }
+    if (!selected) {
+      if (selectedProvider) {
+        console.log(
+          `\nProvider ${selectedProvider.id} is selected but no API key is saved. Open the TUI and use /connect to enter its key.`,
+        );
+      } else {
+        console.log("\nNo provider selected. Open the TUI and use /connect to choose a provider.");
       }
     }
     console.log();
@@ -605,8 +651,3 @@ program
   });
 
 program.parse();
-
-function formatContext(tokens: number): string {
-  if (tokens >= 1_000_000) return `${tokens / 1_000_000}M`;
-  return `${tokens / 1_000}K`;
-}

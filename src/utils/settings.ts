@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { DEFAULT_MODEL, getEffectiveReasoningEffort, getModelIds, normalizeModelId } from "../crow/models";
+import { getEffectiveReasoningEffort, getModelIds, normalizeModelId } from "../crow/models";
 import type { HooksConfig } from "../hooks/types";
 import type {
   LspBuiltInServerId,
@@ -11,6 +11,7 @@ import type {
   NormalizedLspSettings,
 } from "../lsp/types";
 import type { AgentMode, ReasoningEffort } from "../types/index";
+import { type CustomProvider, findProvider, getProviderApiKeyFromEnv, type ProviderDefinition } from "./providers";
 
 export type TelegramStreamingMode = "off" | "partial";
 export type SandboxMode = "off" | "shuru";
@@ -67,13 +68,6 @@ export interface SandboxSettings {
   hostBrowserCommandsOnHost?: boolean;
 }
 
-export interface TelegramAudioInputSettings {
-  /** Enable Telegram voice/audio transcription before sending text to the agent. Default: true. */
-  enabled?: boolean;
-  /** Language code (e.g. `en`, `fr`) forwarded to the Grok STT endpoint. Default: en. */
-  language?: string;
-}
-
 export interface TelegramSettings {
   botToken?: string;
   approvedUserIds?: number[];
@@ -84,7 +78,6 @@ export interface TelegramSettings {
   typingIndicator?: boolean;
   /** Reserved: Bot API `sendMessageDraft` for private DMs (not implemented yet). */
   nativeDrafts?: boolean;
-  audioInput?: TelegramAudioInputSettings;
 }
 
 export type McpRemoteTransport = "http" | "sse";
@@ -162,6 +155,10 @@ export function loadValidSubAgents(): CustomSubagentConfig[] {
 export interface UserSettings {
   apiKey?: string;
   defaultModel?: string;
+  providerId?: string;
+  providerApiKeys?: Record<string, string>;
+  providerModels?: Record<string, string>;
+  customProviders?: CustomProvider[];
   recapsEnabled?: boolean;
   sandboxMode?: SandboxMode;
   sandbox?: SandboxSettings;
@@ -216,6 +213,14 @@ export function saveUserSettings(partial: Partial<UserSettings>): void {
     ...partial,
     ...(partial.apiKey !== undefined ? { apiKey: partial.apiKey } : {}),
     ...(partial.defaultModel !== undefined ? { defaultModel: normalizeModelId(partial.defaultModel) } : {}),
+    ...(partial.providerId !== undefined ? { providerId: partial.providerId } : {}),
+    ...(partial.providerApiKeys !== undefined
+      ? { providerApiKeys: { ...current.providerApiKeys, ...partial.providerApiKeys } }
+      : {}),
+    ...(partial.providerModels !== undefined
+      ? { providerModels: { ...current.providerModels, ...partial.providerModels } }
+      : {}),
+    ...(partial.customProviders !== undefined ? { customProviders: partial.customProviders } : {}),
     ...(partial.sandboxMode !== undefined ? { sandboxMode: normalizeSandboxMode(partial.sandboxMode) } : {}),
     ...(partial.reasoningEffortByModel !== undefined
       ? {
@@ -232,10 +237,6 @@ export function saveUserSettings(partial: Partial<UserSettings>): void {
           telegram: {
             ...current.telegram,
             ...partial.telegram,
-            audioInput: {
-              ...current.telegram?.audioInput,
-              ...partial.telegram?.audioInput,
-            },
             sessionsByUserId: {
               ...current.telegram?.sessionsByUserId,
               ...partial.telegram?.sessionsByUserId,
@@ -309,16 +310,77 @@ export function saveProjectSettings(partial: Partial<ProjectSettings>): void {
   });
 }
 
+export function loadCustomProviders(): CustomProvider[] {
+  const providers = loadUserSettings().customProviders;
+  return Array.isArray(providers) ? providers : [];
+}
+
+export function saveCustomProviders(providers: CustomProvider[]): void {
+  saveUserSettings({ customProviders: providers });
+}
+
+export function getSelectedProviderId(): string | undefined {
+  return process.env.CROW_PROVIDER?.trim() || loadUserSettings().providerId;
+}
+
+export function getProviderApiKey(providerId: string): string | undefined {
+  const saved = loadUserSettings().providerApiKeys?.[providerId]?.trim();
+  if (saved) return saved;
+  return getProviderApiKeyFromEnv(providerId);
+}
+
+export function saveProviderApiKey(providerId: string, apiKey: string): void {
+  const current = loadUserSettings().providerApiKeys ?? {};
+  saveUserSettings({ providerApiKeys: { ...current, [providerId]: apiKey } });
+}
+
+export interface SelectedProvider {
+  provider: ProviderDefinition;
+  apiKey: string;
+  modelId: string;
+}
+
+export function getSelectedProvider(): SelectedProvider | null {
+  const providerId = getSelectedProviderId();
+  if (!providerId) return null;
+  const provider = findProvider(providerId, loadCustomProviders());
+  if (!provider) return null;
+  const apiKey = getProviderApiKey(providerId);
+  if (!apiKey) return null;
+  const user = loadUserSettings();
+  const savedModel = user.providerModels?.[providerId] || user.defaultModel;
+  const modelId =
+    savedModel && provider.models.some((model) => model.id === savedModel)
+      ? savedModel
+      : (provider.models[0]?.id ?? "");
+  return { provider, apiKey, modelId };
+}
+
+export function selectProvider(providerId: string, modelId?: string): SelectedProvider | null {
+  const provider = findProvider(providerId, loadCustomProviders());
+  if (!provider) return null;
+  const model = modelId && provider.models.some((m) => m.id === modelId) ? modelId : (provider.models[0]?.id ?? "");
+  const currentModels = loadUserSettings().providerModels ?? {};
+  saveUserSettings({
+    providerId,
+    providerModels: { ...currentModels, [providerId]: model },
+    defaultModel: model,
+  });
+  const apiKey = getProviderApiKey(providerId);
+  if (!apiKey) return null;
+  return { provider, apiKey, modelId: model };
+}
+
 export function getApiKey(): string | undefined {
-  return process.env.GROK_API_KEY || loadUserSettings().apiKey;
+  return getSelectedProvider()?.apiKey;
 }
 
 export function getBaseURL(): string {
-  return process.env.GROK_BASE_URL || "https://api.x.ai/v1";
+  return getSelectedProvider()?.provider.baseUrl ?? "";
 }
 
 export function getCurrentModel(mode?: AgentMode): string {
-  if (process.env.GROK_MODEL) return normalizeModelId(process.env.GROK_MODEL);
+  if (process.env.CROW_MODEL) return normalizeModelId(process.env.CROW_MODEL);
 
   const project = loadProjectSettings();
   if (project.model) return normalizeModelId(project.model);
@@ -331,17 +393,20 @@ export function getCurrentModel(mode?: AgentMode): string {
     }
   }
 
+  const selected = getSelectedProvider();
+  if (selected) return selected.modelId;
+
   const user = loadUserSettings();
-  return user.defaultModel ? normalizeModelId(user.defaultModel) : DEFAULT_MODEL;
+  return user.defaultModel ? normalizeModelId(user.defaultModel) : "";
 }
 
 /**
  * Returns the explicitly configured model for a mode, or undefined if none is set.
- * Only GROK_MODEL env var suppresses this (absolute override). Project-level model
+ * Only CROW_MODEL env var suppresses this (absolute override). Project-level model
  * does NOT suppress — modeModels is an explicit per-mode config that applies on mode switch.
  */
 export function getModeSpecificModel(mode: AgentMode): string | undefined {
-  if (process.env.GROK_MODEL) return undefined;
+  if (process.env.CROW_MODEL) return undefined;
 
   const user = loadUserSettings();
   const modeModel = user.modeModels?.[mode];
@@ -631,16 +696,6 @@ export function resolveTelegramStreamSettings(t: TelegramSettings | undefined): 
     streaming: t?.streaming === "off" ? "off" : "partial",
     typingIndicator: t?.typingIndicator !== false,
     nativeDrafts: t?.nativeDrafts === true,
-  };
-}
-
-export function resolveTelegramAudioInputSettings(t: TelegramSettings | undefined): {
-  enabled: boolean;
-  language: string;
-} {
-  return {
-    enabled: t?.audioInput?.enabled !== false,
-    language: t?.audioInput?.language?.trim() || "en",
   };
 }
 

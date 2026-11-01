@@ -12,6 +12,7 @@ import {
   getSupportedReasoningEfforts,
   MODELS,
   normalizeModelId,
+  type ProviderModelInfo,
 } from "../crow/models";
 import { parseEnvLines, parseHeaderLines } from "../mcp/parse-headers";
 import { toMcpServerId, validateMcpServerConfig } from "../mcp/validate";
@@ -36,10 +37,20 @@ import { processAtMentions } from "../utils/at-mentions.js";
 import { FileIndex } from "../utils/file-index.js";
 import { copyTextToHostClipboard } from "../utils/host-clipboard";
 import {
+  type CustomProvider,
+  fetchProviderModels,
+  findProvider,
+  getAllProviders,
+  normalizeBaseUrl,
+  type ProviderDefinition,
+} from "../utils/providers";
+import {
   type CustomSubagentConfig,
-  getApiKey,
+  getProviderApiKey,
+  getSelectedProvider,
   getTelegramBotToken,
   isReservedSubagentName,
+  loadCustomProviders,
   loadMcpServers,
   loadPaymentSettings,
   loadUserSettings,
@@ -51,11 +62,14 @@ import {
   type SandboxMode,
   type SandboxSettings,
   saveApprovedTelegramUserId,
+  saveCustomProviders,
   saveMcpServers,
   savePaymentSettings,
   saveProjectSettings,
+  saveProviderApiKey,
   saveRecapsEnabled,
   saveUserSettings,
+  selectProvider,
 } from "../utils/settings";
 import { discoverSkills, formatSkillsForChat } from "../utils/skills";
 import { formatSubagentName } from "../utils/subagent-display";
@@ -329,6 +343,8 @@ Follow the repository's commit and pull request workflows. Inspect the current c
 
 const BUILTIN_TYPED_SLASH_COMMANDS = new Set([
   "/clear",
+  "/connect",
+  "/login",
   "/model",
   "/models",
   "/sandbox",
@@ -640,8 +656,41 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [sessionTitle, setSessionTitle] = useState<string | null>(() => agent.getSessionTitle());
   const [sessionId, setSessionId] = useState<string | null>(() => agent.getSessionId());
   const [sessionRecap, setSessionRecap] = useState<string | null>(() => agent.getSessionRecap());
-  const [showApiKeyModal, setShowApiKeyModal] = useState(() => !initialHasApiKey);
-  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+  const [showProviderModal, setShowProviderModal] = useState(false);
+  const [providerError, setProviderError] = useState<string | null>(null);
+  const [providerStep, setProviderStep] = useState<
+    | "list"
+    | "key"
+    | "customId"
+    | "customName"
+    | "customBaseUrl"
+    | "customKey"
+    | "customModel"
+    | "customModelName"
+    | "customModelList"
+  >("list");
+  const [providerIndex, setProviderIndex] = useState(0);
+  const [providerSelectedId, setProviderSelectedId] = useState<string | null>(null);
+  const [providerLoading, setProviderLoading] = useState(false);
+  const [customProviders, setCustomProviders] = useState<CustomProvider[]>(() => loadCustomProviders());
+  const [customDraft, setCustomDraft] = useState<{
+    id: string;
+    name: string;
+    baseUrl: string;
+    apiKey: string;
+    modelId: string;
+  }>({
+    id: "",
+    name: "",
+    baseUrl: "",
+    apiKey: "",
+    modelId: "",
+  });
+  const [customFetchedModels, setCustomFetchedModels] = useState<string[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+    () => getSelectedProvider()?.provider.id ?? agent.getProviderId() ?? null,
+  );
+  const [providerFetchedModels, setProviderFetchedModels] = useState<string[] | null>(null);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashMenuIndex, setSlashMenuIndex] = useState(0);
   const [slashSearchQuery, setSlashSearchQuery] = useState("");
@@ -665,7 +714,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [pqs, setPqs] = useState<PlanQuestionsState>(initialPlanQuestionsState());
   const pasteCounterRef = useRef(0);
   const pasteBlocksRef = useRef<PasteBlock[]>([]);
-  const apiKeyInputRef = useRef<TextareaRenderable>(null);
+  const providerInputRef = useRef<TextareaRenderable>(null);
   const inputRef = useRef<TextareaRenderable>(null);
   const scrollRef = useRef<ScrollBoxRenderable>(null);
   const { width, height } = useTerminalDimensions();
@@ -674,7 +723,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const startTimeRef = useRef(0);
   const isProcessingRef = useRef(false);
   const hasApiKeyRef = useRef(initialHasApiKey);
-  const showApiKeyModalRef = useRef(!initialHasApiKey);
+  const showProviderModalRef = useRef(false);
   const queuedMessagesRef = useRef<QueuedMessage[]>([]);
   const processMessageRef = useRef<(text: string, displayText?: string) => Promise<void> | void>(() => {});
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
@@ -806,14 +855,46 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   modeInfoRef.current = modeInfo;
   const modelInfo = getModelInfo(model);
   const contextStats = modelInfo ? agent.getContextStats(modelInfo.contextWindow, streamContent) : null;
-  const _flatModels = MODELS.map((m) => m.id);
+  const providerModelInfos: ModelInfo[] = (() => {
+    if (!selectedProviderId) return [];
+    const custom = customProviders.find((provider) => provider.id === selectedProviderId);
+    if (custom) {
+      return custom.models.map((id) => ({
+        id,
+        name: custom.modelNames?.[id] ?? id,
+        contextWindow: 128000,
+        inputPrice: 0,
+        outputPrice: 0,
+        reasoning: false,
+        description: "",
+      }));
+    }
+    if (providerFetchedModels) {
+      return providerFetchedModels.map((id) => {
+        const info = getModelInfo(id);
+        return (
+          info ?? {
+            id,
+            name: id,
+            contextWindow: 128000,
+            inputPrice: 0,
+            outputPrice: 0,
+            reasoning: false,
+            description: "",
+          }
+        );
+      });
+    }
+    return MODELS.filter((m) => (m as ProviderModelInfo).provider === selectedProviderId);
+  })();
+  const _flatModels = providerModelInfos.map((m) => m.id);
   const filteredModels = modelSearchQuery
-    ? MODELS.filter(
+    ? providerModelInfos.filter(
         (m) =>
           m.name.toLowerCase().includes(modelSearchQuery.toLowerCase()) ||
           m.id.toLowerCase().includes(modelSearchQuery.toLowerCase()),
       )
-    : MODELS;
+    : providerModelInfos;
   const filteredModelIds = filteredModels.map((m) => m.id);
   const filteredSlashItems = filterSlashMenuItems(SLASH_MENU_ITEMS, slashSearchQuery);
   const mcpRows = buildMcpBrowseRows(mcpServers, mcpSearchQuery);
@@ -1563,17 +1644,18 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         return existing;
       }
 
-      const apiKey = getApiKey();
-      if (!apiKey) {
-        throw new Error("Grok API key required. Add it in the CLI or set GROK_API_KEY.");
+      const selected = getSelectedProvider();
+      if (!selected) {
+        throw new Error("No provider selected. Use /connect to choose a provider first.");
       }
 
       const u = loadUserSettings();
       const sid = u.telegram?.sessionsByUserId?.[String(userId)];
-      const a = new Agent(apiKey, startupConfig.baseURL, startupConfig.model, startupConfig.maxToolRounds, {
+      const a = new Agent(selected.apiKey, selected.provider.baseUrl, selected.modelId, startupConfig.maxToolRounds, {
         session: sid,
         sandboxMode,
         sandboxSettings,
+        providerId: selected.provider.id,
       });
       if (!sid && a.getSessionId()) {
         saveUserSettings({
@@ -1672,7 +1754,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
   const startTelegramBridge = useCallback(() => {
     const token = getTelegramBotToken();
-    if (!token || !getApiKey()) return;
+    if (!token || !getSelectedProvider()) return;
     if (bridgeRef.current) return;
 
     const bridge = createTelegramBridge({
@@ -1738,49 +1820,231 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     return () => clearTimeout(id);
   }, [copyFlashId]);
 
-  const openApiKeyModal = useCallback(() => {
-    showApiKeyModalRef.current = true;
-    setApiKeyError(null);
-    setShowApiKeyModal(true);
+  const providerRows: ProviderDefinition[] = getAllProviders(customProviders);
+  const openProviderConnect = useCallback(() => {
+    showProviderModalRef.current = true;
+    setProviderError(null);
+    setProviderStep("list");
+    setProviderIndex(0);
+    setProviderLoading(false);
+    setShowProviderModal(true);
   }, []);
 
-  const closeApiKeyModal = useCallback(() => {
-    showApiKeyModalRef.current = false;
-    setApiKeyError(null);
-    setShowApiKeyModal(false);
+  const applyProviderSelection = useCallback(
+    (providerId: string, apiKey: string, modelId: string) => {
+      const selection = selectProvider(providerId, modelId);
+      if (!selection) return;
+      agent.setProvider(providerId, apiKey, selection.provider.baseUrl, selection.modelId);
+      setSelectedProviderId(providerId);
+      setModel(selection.modelId);
+      hasApiKeyRef.current = true;
+      setHasApiKey(true);
+      setProviderFetchedModels(null);
+      setMessages((prev) => [
+        ...prev,
+        buildAssistantEntry(
+          `Connected to ${selection.provider.name}. Model: ${selection.modelId}. Use /models to change the model.`,
+        ),
+      ]);
+    },
+    [agent],
+  );
+
+  const finishCustomProvider = useCallback(
+    (modelId: string, modelName?: string) => {
+      const id = customDraft.id;
+      const custom: CustomProvider = {
+        id,
+        name: customDraft.name || id,
+        baseUrl: normalizeBaseUrl(customDraft.baseUrl),
+        models: [modelId],
+        ...(modelName && modelName !== modelId ? { modelNames: { [modelId]: modelName } } : {}),
+      };
+      const next = [...customProviders.filter((provider) => provider.id !== id), custom];
+      saveCustomProviders(next);
+      setCustomProviders(next);
+      saveProviderApiKey(id, customDraft.apiKey);
+      providerInputRef.current?.clear();
+      showProviderModalRef.current = false;
+      setShowProviderModal(false);
+      setProviderError(null);
+      applyProviderSelection(id, customDraft.apiKey, modelId);
+    },
+    [applyProviderSelection, customDraft, customProviders],
+  );
+
+  const selectProviderRow = useCallback(() => {
+    const rows = getAllProviders(customProviders);
+    if (providerIndex >= rows.length) {
+      setCustomDraft({ id: "", name: "", baseUrl: "", apiKey: "", modelId: "" });
+      setProviderStep("customId");
+      setProviderError(null);
+      providerInputRef.current?.clear();
+      return;
+    }
+    const provider = rows[providerIndex];
+    if (!provider) return;
+    setProviderSelectedId(provider.id);
+    const savedKey = getProviderApiKey(provider.id);
+    if (savedKey) {
+      const selection = selectProvider(provider.id);
+      if (selection) {
+        showProviderModalRef.current = false;
+        setShowProviderModal(false);
+        applyProviderSelection(provider.id, savedKey, selection.modelId);
+      }
+      return;
+    }
+    setProviderStep("key");
+    setProviderError(null);
+    providerInputRef.current?.clear();
+  }, [applyProviderSelection, customProviders, providerIndex]);
+
+  const selectCustomModel = useCallback(() => {
+    const modelId = customFetchedModels[providerIndex];
+    if (modelId) finishCustomProvider(modelId);
+  }, [customFetchedModels, finishCustomProvider, providerIndex]);
+
+  const openProviderModels = useCallback(() => {
+    const selected = getSelectedProvider();
+    if (!selected) {
+      setMessages((prev) => [
+        ...prev,
+        buildAssistantEntry("You have not selected a provider yet. Use /connect to choose a provider first."),
+      ]);
+      return;
+    }
+    setSelectedProviderId(selected.provider.id);
+    setProviderFetchedModels(null);
+    setShowModelPicker(true);
+    setModelPickerIndex(0);
+    setModelSearchQuery("");
+    fetchProviderModels(selected.provider.baseUrl, selected.apiKey)
+      .then((ids) => {
+        if (ids.length > 0) setProviderFetchedModels(ids);
+      })
+      .catch(() => {});
   }, []);
 
-  const submitApiKey = useCallback(() => {
-    const apiKey = (apiKeyInputRef.current?.plainText || "").trim();
-    if (!apiKey) {
-      setApiKeyError("Enter an API key to continue.");
-      return;
-    }
-    if (!apiKey.startsWith("xai-")) {
-      setApiKeyError("API keys should start with xai-.");
-      return;
-    }
+  const closeProviderModal = useCallback(() => {
+    showProviderModalRef.current = false;
+    setProviderError(null);
+    setShowProviderModal(false);
+  }, []);
 
-    saveUserSettings({ apiKey });
-    agent.setApiKey(apiKey);
-    hasApiKeyRef.current = true;
-    showApiKeyModalRef.current = false;
-    setHasApiKey(true);
-    setApiKeyError(null);
-    setShowApiKeyModal(false);
-    apiKeyInputRef.current?.clear();
-    if (getTelegramBotToken()) {
-      startTelegramBridge();
+  const submitProviderStep = useCallback(() => {
+    const input = (providerInputRef.current?.plainText || "").trim();
+    if (providerStep === "key") {
+      if (!input) {
+        setProviderError("Enter an API key to continue.");
+        return;
+      }
+      const providerId = providerSelectedId;
+      if (!providerId) {
+        setProviderError("Choose a provider first.");
+        return;
+      }
+      saveProviderApiKey(providerId, input);
+      providerInputRef.current?.clear();
+      showProviderModalRef.current = false;
+      setShowProviderModal(false);
+      setProviderError(null);
+      const selection = selectProvider(providerId);
+      if (selection) applyProviderSelection(providerId, input, selection.modelId);
+      return;
     }
-  }, [agent, startTelegramBridge]);
+    if (providerStep === "customId") {
+      if (!input) {
+        setProviderError("Enter an id for the custom provider.");
+        return;
+      }
+      const id = input
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      if (!id) {
+        setProviderError("Enter an id using letters and numbers.");
+        return;
+      }
+      if (findProvider(id, customProviders)) {
+        setProviderError("A provider with this id already exists.");
+        return;
+      }
+      setCustomDraft((draft) => ({ ...draft, id }));
+      setProviderStep("customName");
+      setProviderError(null);
+      providerInputRef.current?.clear();
+      return;
+    }
+    if (providerStep === "customName") {
+      setCustomDraft((draft) => ({ ...draft, name: input || draft.id }));
+      setProviderStep("customBaseUrl");
+      setProviderError(null);
+      providerInputRef.current?.clear();
+      return;
+    }
+    if (providerStep === "customBaseUrl") {
+      if (!input.startsWith("http://") && !input.startsWith("https://")) {
+        setProviderError("Enter a base URL starting with http:// or https://.");
+        return;
+      }
+      setCustomDraft((draft) => ({ ...draft, baseUrl: normalizeBaseUrl(input) }));
+      setProviderStep("customKey");
+      setProviderError(null);
+      providerInputRef.current?.clear();
+      return;
+    }
+    if (providerStep === "customKey") {
+      if (!input) {
+        setProviderError("Enter an API key to continue.");
+        return;
+      }
+      const draft = { ...customDraft, apiKey: input };
+      setCustomDraft(draft);
+      setProviderLoading(true);
+      setProviderError(null);
+      providerInputRef.current?.clear();
+      fetchProviderModels(draft.baseUrl, input)
+        .then((ids) => {
+          setProviderLoading(false);
+          if (ids.length > 0) {
+            setCustomFetchedModels(ids);
+            setProviderIndex(0);
+            setProviderStep("customModelList");
+          } else {
+            setProviderStep("customModel");
+          }
+        })
+        .catch(() => {
+          setProviderLoading(false);
+          setProviderStep("customModel");
+        });
+      return;
+    }
+    if (providerStep === "customModel") {
+      if (!input) {
+        setProviderError("Enter a model id, or go back and fetch models from the base URL.");
+        return;
+      }
+      setCustomDraft((draft) => ({ ...draft, modelId: input }));
+      setProviderStep("customModelName");
+      setProviderError(null);
+      providerInputRef.current?.clear();
+      return;
+    }
+    if (providerStep === "customModelName") {
+      finishCustomProvider(customDraft.modelId, input || customDraft.modelId);
+      return;
+    }
+  }, [applyProviderSelection, customDraft, customProviders, finishCustomProvider, providerSelectedId, providerStep]);
 
   useEffect(() => {
     hasApiKeyRef.current = hasApiKey;
   }, [hasApiKey]);
 
   useEffect(() => {
-    showApiKeyModalRef.current = showApiKeyModal;
-  }, [showApiKeyModal]);
+    showProviderModalRef.current = showProviderModal;
+  }, [showProviderModal]);
 
   useEffect(() => {
     showConnectModalRef.current = showConnectModal;
@@ -1835,8 +2099,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       setTelegramTokenError("Paste your bot token from @BotFather.");
       return;
     }
-    if (!getApiKey()) {
-      setTelegramTokenError("Add a Grok API key first.");
+    if (!hasApiKeyRef.current) {
+      setTelegramTokenError("Choose a provider first with /connect.");
       return;
     }
     const u = loadUserSettings();
@@ -1890,9 +2154,12 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
   const beginTelegramFromConnect = useCallback(() => {
     setShowConnectModal(false);
-    if (!getApiKey()) {
-      setMessages((p) => [...p, { type: "assistant", content: "Add a Grok API key first.", timestamp: new Date() }]);
-      openApiKeyModal();
+    if (!hasApiKeyRef.current) {
+      setMessages((p) => [
+        ...p,
+        { type: "assistant", content: "Choose a provider first with /connect.", timestamp: new Date() },
+      ]);
+      openProviderConnect();
       return;
     }
     if (!getTelegramBotToken()) {
@@ -1924,7 +2191,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         },
       ]);
     }
-  }, [openApiKeyModal, startTelegramBridge]);
+  }, [openProviderConnect, startTelegramBridge]);
 
   const interruptActiveRun = useCallback(
     (key?: KeyEvent) => {
@@ -2102,9 +2369,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
 
         if (turnHadAuthError) {
-          setApiKeyError("Your API key is invalid or expired. Please enter a new key.");
-          setShowApiKeyModal(true);
-          showApiKeyModalRef.current = true;
+          setMessages((prev) => [
+            ...prev,
+            buildAssistantEntry("Your API key is invalid or expired. Use /connect to update it."),
+          ]);
         }
 
         if (!isStale()) {
@@ -2128,9 +2396,16 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   );
 
   useEffect(() => {
-    if (initialMessage && hasApiKey && !processedInitial.current) {
+    if (initialMessage && !processedInitial.current) {
       processedInitial.current = true;
-      processMessage(initialMessage);
+      if (hasApiKey) {
+        processMessage(initialMessage);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          buildAssistantEntry("You have not selected a provider yet. Use /connect to choose a provider first."),
+        ]);
+      }
     }
   }, [hasApiKey, initialMessage, processMessage]);
   useEffect(() => {
@@ -2186,10 +2461,12 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         resetToNewSession();
         return true;
       }
+      if (c === "/connect" || c === "/login") {
+        openProviderConnect();
+        return true;
+      }
       if (c === "/model" || c === "/models") {
-        setShowModelPicker(true);
-        setModelPickerIndex(0);
-        setModelSearchQuery("");
+        openProviderModels();
         return true;
       }
       if (c === "/sandbox") {
@@ -2300,6 +2577,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       openRecapPicker,
       openSandboxPicker,
       openWalletPicker,
+      openProviderConnect,
+      openProviderModels,
       openScheduleModal,
       processMessage,
       resetToNewSession,
@@ -2315,10 +2594,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         case "new":
           resetToNewSession();
           break;
+        case "connect":
+          openProviderConnect();
+          break;
         case "models":
-          setShowModelPicker(true);
-          setModelPickerIndex(0);
-          setModelSearchQuery("");
+          openProviderModels();
           break;
         case "sandbox":
           openSandboxPicker();
@@ -2396,6 +2676,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       handleExit,
       openAgentsModal,
       openMcpModal,
+      openProviderConnect,
+      openProviderModels,
       openRecapPicker,
       openSandboxPicker,
       openWalletPicker,
@@ -2407,6 +2689,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   );
 
   const blockPrompt =
+    showProviderModal ||
     showConnectModal ||
     showTelegramTokenModal ||
     showTelegramPairModal ||
@@ -2871,13 +3154,43 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         return;
       }
-      if (showApiKeyModalRef.current) {
+      if (showProviderModalRef.current) {
         if (isEscapeKey(key)) {
-          closeApiKeyModal();
+          closeProviderModal();
+          return;
+        }
+        if (providerStep === "list") {
+          if (key.name === "up") {
+            setProviderIndex((i) => Math.max(0, i - 1));
+            return;
+          }
+          if (key.name === "down") {
+            setProviderIndex((i) => Math.min(providerRows.length, i + 1));
+            return;
+          }
+          if (key.name === "return") {
+            selectProviderRow();
+            return;
+          }
+          return;
+        }
+        if (providerStep === "customModelList") {
+          if (key.name === "up") {
+            setProviderIndex((i) => Math.max(0, i - 1));
+            return;
+          }
+          if (key.name === "down") {
+            setProviderIndex((i) => Math.min(customFetchedModels.length - 1, i + 1));
+            return;
+          }
+          if (key.name === "return") {
+            selectCustomModel();
+            return;
+          }
           return;
         }
         if (key.name === "return") {
-          submitApiKey();
+          submitProviderStep();
         }
         return;
       }
@@ -2941,7 +3254,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             agent.setModel(sel);
             setModel(sel);
             saveProjectSettings({ model: sel });
-            saveUserSettings({ defaultModel: sel });
+            if (selectedProviderId) {
+              const currentModels = loadUserSettings().providerModels ?? {};
+              saveUserSettings({
+                providerModels: { ...currentModels, [selectedProviderId]: sel },
+                defaultModel: sel,
+              });
+            } else {
+              saveUserSettings({ defaultModel: sel });
+            }
           }
           setShowModelPicker(false);
           setModelSearchQuery("");
@@ -3134,8 +3455,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         return;
       }
 
-      if (!hasApiKeyRef.current && shouldOpenApiKeyModalForKey(key)) {
-        openApiKeyModal();
+      if (!hasApiKeyRef.current && shouldOpenProviderModalForKey(key)) {
+        openProviderConnect();
         return;
       }
       if (key.sequence === "/" && !isProcessing) {
@@ -3233,7 +3554,12 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       agentsModalIndex,
       beginTelegramFromConnect,
       btwState,
-      closeApiKeyModal,
+      closeProviderModal,
+      customFetchedModels,
+      providerRows,
+      providerStep,
+      selectCustomModel,
+      selectProviderRow,
       connectModalIndex,
       cycleMode,
       cycleMcpEditorTransport,
@@ -3257,7 +3583,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       mcpModalIndex,
       mcpRows,
       modelPickerIndex,
-      openApiKeyModal,
+      openProviderConnect,
       openMcpEditor,
       replacePasteBlocks,
       openSubagentEditor,
@@ -3295,24 +3621,19 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       applyWalletSettings,
       showSlashMenu,
       slashMenuIndex,
-      submitApiKey,
+      submitProviderStep,
       submitPlanAnswers,
       copyTuiSelectionToHost,
       toggleSavedMcp,
       messages,
       startupConfig.version,
+      selectedProviderId,
     ],
   );
   useKeyboard(handleKey);
 
   const handlePaste = useCallback(
     (event: PasteEvent) => {
-      if (!hasApiKeyRef.current) {
-        event.preventDefault();
-        openApiKeyModal();
-        return;
-      }
-
       const text = decodePasteBytes(event.bytes);
       const trimmed = text.trim();
       const imageExts = /\.(png|jpe?g|gif|webp|svg|bmp|ico|tiff?)$/i;
@@ -3332,7 +3653,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       replacePasteBlocks([...pasteBlocksRef.current, block]);
       inputRef.current?.insertText(getPasteBlockToken(block));
     },
-    [openApiKeyModal, replacePasteBlocks],
+    [replacePasteBlocks],
   );
 
   const handleSubmit = useCallback(() => {
@@ -3361,11 +3682,14 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       message = message.replace(getFileMentionToken(block), `@${block.path}`);
     }
     if (!message.trim()) return;
+    if (handleCommand(message)) return;
     if (!hasApiKeyRef.current) {
-      openApiKeyModal();
+      setMessages((prev) => [
+        ...prev,
+        buildAssistantEntry("You have not selected a provider yet. Use /connect to choose a provider first."),
+      ]);
       return;
     }
-    if (handleCommand(message)) return;
     const { enhancedMessage } = processAtMentions(message.trim(), agent.getCwd());
     if (isProcessingRef.current) {
       queuedMessagesRef.current.push({ text: enhancedMessage, displayText });
@@ -3374,7 +3698,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       return;
     }
     processMessage(enhancedMessage, displayText);
-  }, [agent, clearLiveTurnUi, handleCommand, openApiKeyModal, processMessage, replacePasteBlocks, scrollToBottom]);
+  }, [agent, clearLiveTurnUi, handleCommand, processMessage, replacePasteBlocks, scrollToBottom]);
 
   const hasMessages = messages.length > 0 || streamContent || isProcessing;
 
@@ -3462,7 +3786,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showWalletPicker={showWalletPicker}
                 showSlashMenu={showSlashMenu}
                 showPlanQuestions={showPlanPanel}
-                showApiKeyModal={showApiKeyModal}
+                showProviderModal={showProviderModal}
                 blockPrompt={blockPrompt}
                 onSubmit={handleSubmit}
                 onPaste={handlePaste}
@@ -3502,7 +3826,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showWalletPicker={showWalletPicker}
                 showSlashMenu={showSlashMenu}
                 showPlanQuestions={showPlanPanel}
-                showApiKeyModal={showApiKeyModal}
+                showProviderModal={showProviderModal}
                 blockPrompt={blockPrompt}
                 onSubmit={handleSubmit}
                 onPaste={handlePaste}
@@ -3550,14 +3874,21 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           </box>
         </>
       )}
-      {showApiKeyModal && (
-        <ApiKeyModal
+      {showProviderModal && (
+        <ProviderConnectModal
           t={t}
           width={width}
           height={height}
-          inputRef={apiKeyInputRef}
-          error={apiKeyError}
-          onSubmit={submitApiKey}
+          inputRef={providerInputRef}
+          error={providerError}
+          onSubmit={submitProviderStep}
+          step={providerStep}
+          providers={providerRows}
+          providerIndex={providerIndex}
+          customModels={customFetchedModels}
+          customDraftName={customDraft.name || customDraft.id}
+          selectedProviderName={providerRows.find((provider) => provider.id === providerSelectedId)?.name ?? ""}
+          loading={providerLoading}
         />
       )}
       {showUpdateModal && updateInfo && (
@@ -3792,7 +4123,7 @@ function PromptBox({
   showWalletPicker,
   showSlashMenu,
   showPlanQuestions,
-  showApiKeyModal,
+  showProviderModal,
   blockPrompt,
   onSubmit,
   onPaste,
@@ -3814,7 +4145,7 @@ function PromptBox({
   showWalletPicker: boolean;
   showSlashMenu: boolean;
   showPlanQuestions: boolean;
-  showApiKeyModal: boolean;
+  showProviderModal: boolean;
   blockPrompt?: boolean;
   onSubmit: () => void;
   onPaste: (event: PasteEvent) => void;
@@ -3887,7 +4218,7 @@ function PromptBox({
                 !showWalletPicker &&
                 !showSlashMenu &&
                 !showPlanQuestions &&
-                !showApiKeyModal &&
+                !showProviderModal &&
                 !blockPrompt
               }
               placeholder={isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Crow..."}
@@ -3914,7 +4245,7 @@ function PromptBox({
         flexShrink={0}
       >
         <box flexDirection="row" gap={1} alignItems="center" height={1}>
-          <text fg={t.text}>{modelInfo?.name || model}</text>
+          <text fg={t.text}>{modelInfo?.name || model || "No provider selected"}</text>
           {contextStats ? <ContextMeter t={t} stats={contextStats} /> : null}
         </box>
         <box flexDirection="row" gap={1} alignItems="center" height={1}>
@@ -4069,13 +4400,20 @@ function CopyFlashBanner({ t, width }: { t: Theme; width: number }) {
   );
 }
 
-function ApiKeyModal({
+function ProviderConnectModal({
   t,
   width,
   height,
   inputRef,
   error,
   onSubmit,
+  step,
+  providers,
+  providerIndex,
+  customModels,
+  customDraftName,
+  selectedProviderName,
+  loading,
 }: {
   t: Theme;
   width: number;
@@ -4083,11 +4421,80 @@ function ApiKeyModal({
   inputRef: React.RefObject<TextareaRenderable | null>;
   error: string | null;
   onSubmit: () => void;
+  step:
+    | "list"
+    | "key"
+    | "customId"
+    | "customName"
+    | "customBaseUrl"
+    | "customKey"
+    | "customModel"
+    | "customModelName"
+    | "customModelList";
+  providers: ProviderDefinition[];
+  providerIndex: number;
+  customModels: string[];
+  customDraftName: string;
+  selectedProviderName: string;
+  loading: boolean;
 }) {
   const overlayBg = "#000000cc" as string;
   const panelWidth = Math.min(68, width - 6);
-  const panelHeight = 13;
+  const isList = step === "list" || step === "customModelList";
+  const listItems =
+    step === "list" ? [...providers.map((provider) => provider.name), "Add custom provider..."] : customModels;
+  const panelHeight = isList ? Math.min(listItems.length + 7, Math.floor(height * 0.7)) : 13;
   const top = bottomAlignedModalTop(height, panelHeight);
+  const title =
+    step === "list"
+      ? "Connect a provider"
+      : step === "key"
+        ? `API key for ${selectedProviderName}`
+        : step === "customId"
+          ? "Custom provider id"
+          : step === "customName"
+            ? "Custom provider name"
+            : step === "customBaseUrl"
+              ? "Custom provider base URL"
+              : step === "customKey"
+                ? `API key for ${customDraftName}`
+                : step === "customModel"
+                  ? `Model id for ${customDraftName}`
+                  : step === "customModelName"
+                    ? `Model name for ${customDraftName}`
+                    : `Pick a model for ${customDraftName}`;
+  const prompt =
+    step === "list"
+      ? "Pick a provider. If it already has a saved key, it connects right away."
+      : step === "key"
+        ? "Paste the API key. It is saved to ~/.crow/user-settings.json."
+        : step === "customId"
+          ? "An id like openrouter. It is used in commands and settings."
+          : step === "customName"
+            ? "Display name, for example MiMo Router. Leave empty to use the id."
+            : step === "customBaseUrl"
+              ? "Base URL of the OpenAI-compatible API, for example https://example.com/v1."
+              : step === "customKey"
+                ? "Paste the API key for this provider."
+                : step === "customModel"
+                  ? "Models could not be fetched from this base URL. Type a model id instead."
+                  : step === "customModelName"
+                    ? "Display name for this model. Leave empty to use the model id."
+                    : "Models fetched from this base URL. Pick one.";
+  const placeholder =
+    step === "key" || step === "customKey"
+      ? "sk-..."
+      : step === "customId"
+        ? "openrouter"
+        : step === "customName"
+          ? "My provider"
+          : step === "customBaseUrl"
+            ? "https://example.com/v1"
+            : step === "customModel"
+              ? "my-model-id"
+              : step === "customModelName"
+                ? "My Model"
+                : "";
 
   return (
     <box
@@ -4110,40 +4517,64 @@ function ApiKeyModal({
       >
         <box flexShrink={0} flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2}>
           <text fg={t.primary}>
-            <b>{"Add API key"}</b>
+            <b>{title}</b>
           </text>
           <text fg={t.textMuted}>{"esc"}</text>
         </box>
         <box paddingLeft={2} paddingRight={2} paddingTop={1}>
-          <text fg={t.text}>{"Paste your xAI API key to unlock chat. You can hide this prompt with esc."}</text>
+          <text fg={t.text}>{loading ? "Fetching models..." : prompt}</text>
         </box>
-        <box paddingLeft={2} paddingRight={2} paddingTop={1}>
-          <box backgroundColor={t.backgroundElement} paddingLeft={1} paddingRight={1} width="100%">
-            <textarea
-              ref={inputRef}
-              focused={true}
-              placeholder="xai-..."
-              textColor={t.text}
-              backgroundColor={t.backgroundElement}
-              placeholderColor={t.textMuted}
-              minHeight={1}
-              maxHeight={3}
-              wrapMode="word"
-              keyBindings={TEXTAREA_KEYBINDINGS}
-              onSubmit={onSubmit as unknown as () => void}
-            />
+        {isList ? (
+          <scrollbox flexGrow={1} minHeight={0}>
+            {listItems.map((item, idx) => {
+              const selected = idx === providerIndex;
+              return (
+                <box
+                  key={item}
+                  backgroundColor={selected ? t.selectedBg : undefined}
+                  paddingLeft={2}
+                  paddingRight={2}
+                  width="100%"
+                >
+                  <text fg={selected ? t.selected : t.text}>{item}</text>
+                </box>
+              );
+            })}
+            {listItems.length === 0 && (
+              <box paddingLeft={2}>
+                <text fg={t.textMuted}>{"No models found"}</text>
+              </box>
+            )}
+          </scrollbox>
+        ) : (
+          <box paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <box backgroundColor={t.backgroundElement} paddingLeft={1} paddingRight={1} width="100%">
+              <textarea
+                ref={inputRef}
+                focused={true}
+                placeholder={placeholder}
+                textColor={t.text}
+                backgroundColor={t.backgroundElement}
+                placeholderColor={t.textMuted}
+                minHeight={1}
+                maxHeight={3}
+                wrapMode="word"
+                keyBindings={TEXTAREA_KEYBINDINGS}
+                onSubmit={onSubmit as unknown as () => void}
+              />
+            </box>
           </box>
-        </box>
+        )}
         <box flexGrow={1} minHeight={0} />
         <box paddingLeft={2} paddingRight={2} paddingTop={2} paddingBottom={1}>
           {error ? (
             <text fg={t.diffRemovedFg}>{error}</text>
           ) : (
             <text>
-              <span style={{ fg: t.primary }}>{"enter "}</span>
-              <span style={{ fg: t.textMuted }}>{"save key  ·  "}</span>
+              <span style={{ fg: t.primary }}>{isList ? "enter " : "enter "}</span>
+              <span style={{ fg: t.textMuted }}>{isList ? "select  ·  " : "save  ·  "}</span>
               <span style={{ fg: t.primary }}>{"esc "}</span>
-              <span style={{ fg: t.textMuted }}>{"hide"}</span>
+              <span style={{ fg: t.textMuted }}>{"close"}</span>
             </text>
           )}
         </box>
@@ -5803,15 +6234,13 @@ function sanitizeContent(raw: string): string {
   s = s.replace(/\{"success"\s*:\s*(true|false)\s*,\s*"output"\s*:\s*"[\s\S]*$/m, "");
   return s.trim();
 }
-function shouldOpenApiKeyModalForKey(key: {
+function shouldOpenProviderModalForKey(_key: {
   name?: string;
   sequence?: string;
   ctrl?: boolean;
   meta?: boolean;
 }): boolean {
-  if (key.ctrl || key.meta) return false;
-  if (key.name === "return" || key.name === "backspace") return true;
-  return !!(key.sequence && key.sequence.length === 1);
+  return false;
 }
 function compactTaskLabel(label: string): string {
   const words = label.trim().split(/\s+/).filter(Boolean);

@@ -8,6 +8,7 @@ import {
   getCurrentModel,
   getCurrentSandboxMode,
   getCurrentSandboxSettings,
+  getSelectedProviderId,
   getTelegramBotToken,
   loadUserSettings,
   type SandboxMode,
@@ -37,6 +38,7 @@ export interface TelegramHeadlessBridgeOptions {
 
 interface TelegramHeadlessStartupConfig {
   apiKey: string;
+  providerId?: string;
   baseURL: string;
   model: string;
   sandboxMode: SandboxMode;
@@ -80,7 +82,12 @@ function buildTelegramAgentFactory(startupConfig: TelegramHeadlessStartupConfig)
       startupConfig.baseURL,
       startupConfig.model,
       startupConfig.maxToolRounds,
-      { session: sessionId, sandboxMode: startupConfig.sandboxMode, sandboxSettings: startupConfig.sandboxSettings },
+      {
+        session: sessionId,
+        sandboxMode: startupConfig.sandboxMode,
+        sandboxSettings: startupConfig.sandboxSettings,
+        providerId: startupConfig.providerId,
+      },
     );
 
     const nextSessionId = agent.getSessionId();
@@ -122,11 +129,12 @@ export async function runTelegramHeadlessBridge(options: TelegramHeadlessBridgeO
 
   const apiKey = options.apiKey ?? getApiKey();
   if (!apiKey) {
-    throw new Error("Missing Grok API key.");
+    throw new Error("No provider selected. Use /connect in the TUI to choose a provider first.");
   }
 
   const startupConfig: TelegramHeadlessStartupConfig = {
     apiKey,
+    providerId: getSelectedProviderId(),
     baseURL: options.baseURL ?? getBaseURL(),
     model: options.model ?? getCurrentModel(),
     sandboxMode: options.sandboxMode ?? getCurrentSandboxMode(),

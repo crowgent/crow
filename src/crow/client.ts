@@ -1,16 +1,10 @@
-import { createXai } from "@ai-sdk/xai";
+import { createOpenAI } from "@ai-sdk/openai";
+import type { SharedV3ProviderOptions } from "@ai-sdk/provider";
 import { generateText } from "ai";
-import type { ModelInfo, ReasoningEffort } from "../types/index";
-import { getReasoningEffortForModel } from "../utils/settings";
-import { getEffectiveReasoningEffort, getModelInfo, normalizeModelId } from "./models";
+import { getModelInfo, normalizeModelId, type ProviderModelInfo } from "./models";
 
-export type XaiProvider = ReturnType<typeof createXai>;
-export type XaiChatModel = ReturnType<XaiProvider>;
-export type XaiResponsesModel = ReturnType<XaiProvider["responses"]>;
-export type CrowRuntimeModel = XaiChatModel | XaiResponsesModel;
-
-const DEFAULT_TITLE_MODEL = "grok-4.20-non-reasoning";
-const DEFAULT_RECAP_MODEL = "grok-4.20-non-reasoning";
+export type CrowProvider = ReturnType<typeof createOpenAI>;
+export type CrowRuntimeModel = ReturnType<CrowProvider>;
 
 interface GeneratedTextResult {
   modelId: string;
@@ -32,48 +26,39 @@ export interface GeneratedRecap extends GeneratedTextResult {
 export interface ResolvedModelRuntime {
   model: CrowRuntimeModel;
   modelId: string;
-  modelInfo?: ModelInfo;
-  providerOptions?: {
-    xai: {
-      reasoningEffort: ReasoningEffort;
-    };
-  };
+  modelInfo?: ProviderModelInfo;
+  providerOptions?: SharedV3ProviderOptions;
 }
 
-export function createProvider(apiKey: string, baseURL?: string): XaiProvider {
-  return createXai({
+export function createProvider(apiKey: string, baseURL?: string): CrowProvider {
+  return createOpenAI({
     apiKey,
-    baseURL: baseURL || process.env.GROK_BASE_URL || "https://api.x.ai/v1",
+    baseURL: baseURL || undefined,
   });
 }
 
-export function resolveModelRuntime(provider: XaiProvider, requestedModelId: string): ResolvedModelRuntime {
+export function resolveModelRuntime(provider: CrowProvider, requestedModelId: string): ResolvedModelRuntime {
   const modelId = normalizeModelId(requestedModelId);
   const modelInfo = getModelInfo(modelId);
-  const reasoningEffort = getEffectiveReasoningEffort(modelId, getReasoningEffortForModel(modelId));
-
   return {
-    model: modelInfo?.responsesOnly ? provider.responses(modelId) : provider(modelId),
+    model: provider(modelId),
     modelId,
     modelInfo,
-    providerOptions: reasoningEffort
-      ? {
-          xai: {
-            reasoningEffort,
-          },
-        }
-      : undefined,
+    providerOptions: undefined,
   };
 }
 
-export async function generateTitle(provider: XaiProvider, userMessage: string): Promise<GeneratedTitle> {
-  const runtime = resolveModelRuntime(provider, DEFAULT_TITLE_MODEL);
+export async function generateTitle(
+  provider: CrowProvider,
+  userMessage: string,
+  modelId?: string,
+): Promise<GeneratedTitle> {
+  const runtime = resolveModelRuntime(provider, modelId || "gpt-5");
   try {
     const { text, usage } = await generateText({
       model: runtime.model,
       temperature: 0.5,
-      ...(runtime.modelInfo?.supportsMaxOutputTokens === false ? {} : { maxOutputTokens: 60 }),
-      ...(runtime.providerOptions ? { providerOptions: runtime.providerOptions } : {}),
+      maxOutputTokens: 60,
       system: [
         "You are a title generator. Output ONLY a short title. Nothing else.",
         "Rules:",
@@ -98,18 +83,18 @@ export async function generateTitle(provider: XaiProvider, userMessage: string):
 }
 
 export async function generateRecap(
-  provider: XaiProvider,
+  provider: CrowProvider,
   transcript: string,
   signal?: AbortSignal,
+  modelId?: string,
 ): Promise<GeneratedRecap> {
-  const runtime = resolveModelRuntime(provider, DEFAULT_RECAP_MODEL);
+  const runtime = resolveModelRuntime(provider, modelId || "gpt-5");
   try {
     const { text, usage } = await generateText({
       model: runtime.model,
       abortSignal: signal,
       temperature: 0.3,
-      ...(runtime.modelInfo?.supportsMaxOutputTokens === false ? {} : { maxOutputTokens: 120 }),
-      ...(runtime.providerOptions ? { providerOptions: runtime.providerOptions } : {}),
+      maxOutputTokens: 120,
       system: [
         "You write terse coding-session recaps.",
         "Output ONLY the recap text. No bullets, headings, labels, or preamble.",

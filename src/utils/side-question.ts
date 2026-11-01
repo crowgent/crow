@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { resolveModelRuntime, type XaiProvider } from "../crow/client.js";
+import { type CrowProvider, resolveModelRuntime } from "../crow/client.js";
 
 export interface SideQuestionResult {
   response: string;
@@ -12,7 +12,7 @@ If conversation context is provided below, use it to give a more relevant answer
 
 export async function runSideQuestion(
   question: string,
-  provider: XaiProvider,
+  provider: CrowProvider,
   modelId: string,
   conversationContext: string,
   signal?: AbortSignal,

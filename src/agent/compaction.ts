@@ -1,5 +1,5 @@
 import { generateText, type ModelMessage } from "ai";
-import { resolveModelRuntime, type XaiProvider } from "../crow/client";
+import { type CrowProvider, resolveModelRuntime } from "../crow/client";
 import { containsEncryptedReasoning } from "./reasoning";
 
 export interface CompactionSettings {
@@ -391,7 +391,7 @@ export function serializeConversation(messages: ModelMessage[]): string {
 }
 
 async function summarizeConversation(
-  provider: XaiProvider,
+  provider: CrowProvider,
   modelId: string,
   messages: ModelMessage[],
   reserveTokens: number,
@@ -432,7 +432,7 @@ async function summarizeConversation(
 }
 
 export async function generateCompactionSummary(
-  provider: XaiProvider,
+  provider: CrowProvider,
   modelId: string,
   preparation: PreparedCompaction,
   customInstructions?: string,

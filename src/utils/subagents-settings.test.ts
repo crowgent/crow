@@ -10,17 +10,15 @@ describe("parseSubAgentsRawList", () => {
   });
 
   it("keeps valid entries with known model ids", () => {
-    expect(
-      parseSubAgentsRawList([{ name: "docs", model: "grok-4.3", instruction: "Focus on documentation." }]),
-    ).toEqual([{ name: "docs", model: "grok-4.3", instruction: "Focus on documentation." }]);
+    expect(parseSubAgentsRawList([{ name: "docs", model: "gpt-5", instruction: "Focus on documentation." }])).toEqual([
+      { name: "docs", model: "gpt-5", instruction: "Focus on documentation." },
+    ]);
   });
 
-  it("normalizes aliases to canonical ids", () => {
+  it("keeps provider model ids as given", () => {
     expect(
-      parseSubAgentsRawList([
-        { name: "research", model: "x-ai/grok-4.20-multi-agent-beta", instruction: "Focus on research." },
-      ]),
-    ).toEqual([{ name: "research", model: "grok-4.20-multi-agent-0309", instruction: "Focus on research." }]);
+      parseSubAgentsRawList([{ name: "research", model: "deepseek-reasoner", instruction: "Focus on research." }]),
+    ).toEqual([{ name: "research", model: "deepseek-reasoner", instruction: "Focus on research." }]);
   });
 
   it("skips unknown models", () => {
@@ -30,13 +28,13 @@ describe("parseSubAgentsRawList", () => {
   it("skips reserved and empty names", () => {
     expect(
       parseSubAgentsRawList([
-        { name: "general", model: "grok-4.3", instruction: "x" },
-        { name: "Explore", model: "grok-4.3", instruction: "x" },
-        { name: "vision", model: "grok-4.3", instruction: "x" },
-        { name: "Verify", model: "grok-4.3", instruction: "x" },
-        { name: "computer", model: "grok-4.3", instruction: "x" },
-        { name: "", model: "grok-4.3", instruction: "x" },
-        { name: "  ", model: "grok-4.3", instruction: "x" },
+        { name: "general", model: "gpt-5", instruction: "x" },
+        { name: "Explore", model: "gpt-5", instruction: "x" },
+        { name: "vision", model: "gpt-5", instruction: "x" },
+        { name: "Verify", model: "gpt-5", instruction: "x" },
+        { name: "computer", model: "gpt-5", instruction: "x" },
+        { name: "", model: "gpt-5", instruction: "x" },
+        { name: "  ", model: "gpt-5", instruction: "x" },
       ]),
     ).toEqual([]);
   });
@@ -44,36 +42,33 @@ describe("parseSubAgentsRawList", () => {
   it("dedupes by case-insensitive name with first entry winning", () => {
     expect(
       parseSubAgentsRawList([
-        { name: "Docs", model: "grok-4-1-fast", instruction: "first" },
-        { name: "docs", model: "grok-code-fast-1", instruction: "second" },
+        { name: "Docs", model: "gpt-5", instruction: "first" },
+        { name: "docs", model: "gpt-5-mini", instruction: "second" },
       ]),
-    ).toEqual([{ name: "Docs", model: "grok-4.3", instruction: "first" }]);
+    ).toEqual([{ name: "Docs", model: "gpt-5", instruction: "first" }]);
   });
 
   it("ignores non-object rows", () => {
-    expect(parseSubAgentsRawList([null, "x", { name: "ok", model: "grok-3-mini", instruction: "" }])).toEqual([
-      { name: "ok", model: "grok-3-mini", instruction: "" },
+    expect(parseSubAgentsRawList([null, "x", { name: "ok", model: "gpt-5", instruction: "" }])).toEqual([
+      { name: "ok", model: "gpt-5", instruction: "" },
     ]);
   });
 });
 
 describe("getCurrentModel with modeModels", () => {
   beforeEach(() => {
-    delete process.env.GROK_MODEL;
+    delete process.env.CROW_MODEL;
   });
 
-  it("respects mode-specific models when provided", () => {
-    // This test assumes a test environment where we can check the logic path.
-    // In a real environment with proper settings, this would return the mode-specific model.
+  it("returns a string model id", () => {
     const result = getCurrentModel("agent" as AgentMode);
     expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
   });
 
-  it("respects GROK_MODEL environment variable over modeModels", () => {
-    process.env.GROK_MODEL = "grok-4-special-test";
+  it("respects CROW_MODEL environment variable over modeModels", () => {
+    process.env.CROW_MODEL = "gpt-5-test";
 
     const result = getCurrentModel("agent" as AgentMode);
-    expect(result).toBe("grok-4-special-test");
+    expect(result).toBe("gpt-5-test");
   });
 });
