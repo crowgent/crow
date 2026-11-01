@@ -628,12 +628,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "glm-5.3-flash", name: "GLM-5.3-Flash", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.5", name: "GPT-5.5", contextWindow: 1050000, reasoning: true },
       { id: "mistral-large-2512", name: "mistral-large-2512", contextWindow: 128000 },
-      {
-        id: "grok-4.20-beta-0309-reasoning",
-        name: "grok-4.20-beta-0309-reasoning",
-        contextWindow: 2000000,
-        reasoning: true,
-      },
+
       { id: "qwen3.8-max", name: "Qwen3.8 Max", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.6-sol-pro", name: "gpt-5.6-sol-pro", contextWindow: 1050000, reasoning: true },
       { id: "kimi-k2.5", name: "Kimi K2.5", contextWindow: 262144, reasoning: true },
@@ -642,7 +637,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "glm-5-turbo", name: "glm-5-turbo", contextWindow: 200000, reasoning: true },
       { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", contextWindow: 1000000, reasoning: true },
       { id: "claude-opus-5-5", name: "Claude Opus 5.5", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.1", name: "grok-4.1", contextWindow: 200000 },
+
       { id: "MiniMax-M2.7", name: "MiniMax-M2.7", contextWindow: 204800, reasoning: true },
       { id: "MiniMax-M2.1", name: "MiniMax-M2.1", contextWindow: 204800, reasoning: true },
       { id: "gpt-4o", name: "gpt-4o", contextWindow: 128000 },
@@ -660,12 +655,12 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gemini-3.7-flash", name: "Gemini 3.7 Flash", contextWindow: 1048576, reasoning: true },
       { id: "qwen3.7-max-2026-06-08", name: "qwen3.7-max-2026-06-08", contextWindow: 1000000, reasoning: true },
       { id: "MiniMax-M2", name: "MiniMax-M2", contextWindow: 1000000 },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "claude-sonnet-5", name: "Claude Sonnet 5", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", contextWindow: 1050000, reasoning: true },
       { id: "glm-5.2", name: "GLM-5.2", contextWindow: 1000000, reasoning: true },
       { id: "claude-opus-4-7-thinking", name: "claude-opus-4-7-thinking", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+
       { id: "gpt-5.4-nano", name: "gpt-5.4-nano", contextWindow: 400000, reasoning: true },
       { id: "gpt-6.1-sol", name: "GPT-6.1 Sol", contextWindow: 1050000, reasoning: true },
       { id: "gpt-5.4", name: "gpt-5.4", contextWindow: 1050000, reasoning: true },
@@ -690,7 +685,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "glm-5", name: "glm-5", contextWindow: 204800, reasoning: true },
       { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048576, reasoning: true },
       { id: "qwen3-235b-a22b-instruct-2507", name: "qwen3-235b-a22b-instruct-2507", contextWindow: 128000 },
-      { id: "grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
+
       { id: "kimi-k3", name: "Kimi K3", contextWindow: 1048576, reasoning: true },
       { id: "glm-4.5", name: "GLM-4.5", contextWindow: 131072, reasoning: true },
       { id: "gpt-5.2-chat-latest", name: "gpt-5.2-chat-latest", contextWindow: 128000, reasoning: true },
@@ -700,7 +695,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-5-pro", name: "gpt-5-pro", contextWindow: 400000, reasoning: true },
       { id: "ministral-14b-2512", name: "ministral-14b-2512", contextWindow: 128000 },
       { id: "claude-opus-4-7", name: "claude-opus-4-7", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4-1-fast-reasoning", name: "grok-4-1-fast-reasoning", contextWindow: 2000000, reasoning: true },
+
       { id: "kimi-k2.6", name: "Kimi K2.6", contextWindow: 262144, reasoning: true },
       { id: "gpt-5.6-luna-pro", name: "gpt-5.6-luna-pro", contextWindow: 1050000, reasoning: true },
       { id: "gpt-6-astra", name: "GPT-6 Astra", contextWindow: 1050000, reasoning: true },
@@ -718,7 +713,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "glm-4.7", name: "glm-4.7", contextWindow: 204800, reasoning: true },
       { id: "glm-4.5v", name: "GLM-4.5V", contextWindow: 64000, reasoning: true },
       { id: "claude-opus-4-5-20251101", name: "claude-opus-4-5-20251101", contextWindow: 200000, reasoning: true },
-      { id: "grok-4-fast-non-reasoning", name: "grok-4-fast-non-reasoning", contextWindow: 2000000 },
+
       { id: "glm-5v-turbo", name: "GLM-5V-Turbo", contextWindow: 200000, reasoning: true },
       { id: "gemini-3-pro-preview", name: "gemini-3-pro-preview", contextWindow: 1000000 },
       { id: "claude-fable-5", name: "Claude Fable 5", contextWindow: 1000000, reasoning: true },
@@ -756,11 +751,11 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", contextWindow: 1048576, reasoning: true },
       { id: "gemini-2.5-flash-preview-09-2025", name: "gemini-2.5-flash-preview-09-2025", contextWindow: 1000000 },
       { id: "MiniMax-M2.5", name: "MiniMax-M2.5", contextWindow: 204800, reasoning: true },
-      { id: "grok-4-fast-reasoning", name: "grok-4-fast-reasoning", contextWindow: 2000000, reasoning: true },
+
       { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5-mini", name: "gpt-5-mini", contextWindow: 400000, reasoning: true },
       { id: "doubao-seed-1-6-vision-250815", name: "doubao-seed-1-6-vision-250815", contextWindow: 256000 },
-      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "claude-haiku-4-5", name: "claude-haiku-4-5", contextWindow: 200000, reasoning: true },
       { id: "gpt-5.3-chat-latest", name: "GPT-5.3 Chat (latest)", contextWindow: 128000 },
       { id: "claude-sonnet-4-5-20250929", name: "claude-sonnet-4-5-20250929", contextWindow: 200000, reasoning: true },
@@ -792,10 +787,10 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "muse-spark-1.1", name: "Muse Spark 1.1", contextWindow: 1000000, reasoning: true },
       { id: "o3", name: "o3", contextWindow: 200000, reasoning: true },
       { id: "gemini-3.7-flash", name: "Gemini 3.7 Flash", contextWindow: 1048576, reasoning: true },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "claude-sonnet-5", name: "Claude Sonnet 5", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+
       { id: "gpt-5.4-nano", name: "GPT-5.4 nano", contextWindow: 400000, reasoning: true },
       { id: "gpt-4o-mini", name: "GPT-4o mini", contextWindow: 128000 },
       { id: "gpt-5.4", name: "GPT-5.4", contextWindow: 400000, reasoning: true },
@@ -827,7 +822,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "o3-mini", name: "o3-mini", contextWindow: 200000, reasoning: true },
       { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5-mini", name: "GPT-5 Mini", contextWindow: 400000, reasoning: true },
-      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "claude-sonnet-4-5-20250929", name: "Claude Sonnet 4.5", contextWindow: 200000, reasoning: true },
       { id: "gpt-5-nano", name: "GPT-5 Nano", contextWindow: 400000, reasoning: true },
       { id: "openai/gpt-oss-120b", name: "GPT OSS 120B", contextWindow: 128000, reasoning: true },
@@ -978,12 +973,12 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "kimi-k2.7-code-highspeed", name: "Kimi K2.7 Code Highspeed", contextWindow: 262144, reasoning: true },
       { id: "step-3.7-flash", name: "Step 3.7 Flash", contextWindow: 256000, reasoning: true },
       { id: "deepseek-v4-flash-0731", name: "DeepSeek V4 Flash 0731", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "claude-sonnet-5", name: "Claude Sonnet 5", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", contextWindow: 1050000, reasoning: true },
       { id: "glm-5.2", name: "GLM-5.2", contextWindow: 1000000, reasoning: true },
       { id: "mimo-v2.6-pro", name: "MiMo-V2.6-Pro", contextWindow: 1048576, reasoning: true },
-      { id: "grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+
       { id: "gpt-5.4-nano", name: "GPT-5.4 nano", contextWindow: 400000, reasoning: true },
       { id: "claude-opus-4-7-think", name: "Claude Opus 4.7 Thinking", contextWindow: 1000000, reasoning: true },
       { id: "gpt-6.1-sol", name: "GPT-6.1 Sol", contextWindow: 1050000, reasoning: true },
@@ -1007,7 +1002,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "mimo-v2.6-pro-ultraspeed", name: "MiMo-V2.6-Pro-UltraSpeed", contextWindow: 1048576, reasoning: true },
       { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048576, reasoning: true },
       { id: "gpt-5.2-codex", name: "GPT-5.2 Codex", contextWindow: 400000, reasoning: true },
-      { id: "grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
+
       { id: "coding-xiaomi-mimo-v2.5", name: "Coding Xiaomi MiMo-V2.5", contextWindow: 1048576, reasoning: true },
       { id: "kimi-k3", name: "Kimi K3", contextWindow: 1048576, reasoning: true },
       { id: "coding-minimax-m2.7", name: "Coding MiniMax M2.7", contextWindow: 204800, reasoning: true },
@@ -1070,7 +1065,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "claude-opus-5", name: "Claude Opus 5", contextWindow: 1000000, reasoning: true },
       { id: "gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", contextWindow: 1048576, reasoning: true },
       { id: "gpt-5", name: "GPT-5", contextWindow: 400000, reasoning: true },
-      { id: "grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
+
       { id: "claude-sonnet-4-5-think", name: "Claude Sonnet 4.5 Thinking", contextWindow: 200000, reasoning: true },
       { id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash", contextWindow: 1000000, reasoning: true },
       {
@@ -1119,7 +1114,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       },
       { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.1-codex", name: "GPT-5.1 Codex", contextWindow: 400000, reasoning: true },
-      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "coding-glm-5.1-free", name: "Coding GLM 5.1 (free)", contextWindow: 200000, reasoning: true },
       { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (latest)", contextWindow: 200000, reasoning: true },
       {
@@ -1222,8 +1217,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "unbiased/pareto", name: "Pareto", contextWindow: 262144 },
       { id: "inference-net/schematron-v2-turbo", name: "Schematron V2 Turbo", contextWindow: 128000 },
       { id: "inference-net/schematron-v2-small", name: "Schematron V2 Small", contextWindow: 128000 },
-      { id: "x-ai/grok-4-20-0309-non-reasoning", name: "Grok 4.20 Non-Reasoning", contextWindow: 2000000 },
-      { id: "x-ai/grok-4-fast-non-reasoning", name: "Grok 4 Fast Non-Reasoning", contextWindow: 2000000 },
+
       { id: "perplexity/sonar", name: "Sonar", contextWindow: 128000 },
       { id: "perplexity/sonar-pro", name: "Sonar Pro", contextWindow: 200000 },
       { id: "amazon/nova-micro-v1", name: "Nova Micro 1.0", contextWindow: 128000 },
@@ -1496,7 +1490,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "openai/o3-mini", name: "o3-mini", contextWindow: 200000, reasoning: true },
       { id: "openai/gpt-5-mini", name: "GPT-5 Mini", contextWindow: 400000, reasoning: true },
       { id: "mistralai/mistral-large-2512", name: "Mistral Large 3", contextWindow: 262144 },
-      { id: "xai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "perplexity/sonar-pro", name: "Sonar Pro", contextWindow: 200000 },
       { id: "perplexity/sonar-reasoning-pro", name: "Sonar Reasoning Pro", contextWindow: 128000, reasoning: true },
       { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1048576, reasoning: true },
@@ -1550,7 +1544,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1048576, reasoning: true },
       { id: "minimax-m2-7", name: "MiniMax-M2.7", contextWindow: 204800, reasoning: true },
       { id: "kimi-k2.5", name: "Kimi K2.5", contextWindow: 262144, reasoning: true },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048576, reasoning: true },
       { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", contextWindow: 1000000, reasoning: true },
       { id: "claude-opus-4-6", name: "Claude Opus 4.6", contextWindow: 1000000, reasoning: true },
@@ -1830,9 +1824,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       },
       { id: "meta/muse-spark-1.3", name: "Muse Spark 1.3", contextWindow: 1048576, reasoning: true },
       { id: "meta/muse-spark-1.2", name: "Muse Spark 1.2", contextWindow: 1048576, reasoning: true },
-      { id: "xai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "Qwen/Qwen3.8-Max", name: "Qwen3.8 Max", contextWindow: 1000000, reasoning: true },
       { id: "Qwen/Qwen3.8-Flash", name: "Qwen3.8 Flash", contextWindow: 1000000, reasoning: true },
       { id: "Qwen/Qwen3.8-Max-0902", name: "Qwen3.8 Max 0902", contextWindow: 1000000, reasoning: true },
@@ -2050,11 +2042,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "z-ai/glm-5.3", name: "GLM-5.3", contextWindow: 1000000, reasoning: true },
       { id: "z-ai/glm-4.7", name: "GLM-4.7", contextWindow: 200000, reasoning: true },
       { id: "z-ai/glm-5.1", name: "GLM-5.1", contextWindow: 200000, reasoning: true },
-      { id: "x-ai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "x-ai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      { id: "x-ai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "xiaomi/mimo-v2.6-pro", name: "MiMo-V2.6-Pro", contextWindow: 1048576, reasoning: true },
       { id: "xiaomi/mimo-v2.6-flash", name: "MiMo-V2.6-Flash", contextWindow: 1048576, reasoning: true },
       { id: "moonshot/kimi-k2.7-code", name: "Kimi K2.7 Code", contextWindow: 262000, reasoning: true },
@@ -2131,12 +2119,11 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-5.5", name: "GPT-5.5", contextWindow: 1050000, reasoning: true },
       { id: "kimi-k2.5", name: "Kimi K2.5", contextWindow: 262144, reasoning: true },
       { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", contextWindow: 200000, reasoning: true },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "gpt-5.4", name: "GPT-5.4", contextWindow: 1050000, reasoning: true },
       { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048576, reasoning: true },
       { id: "claude-opus-4-8", name: "Claude Opus 4.8", contextWindow: 1000000, reasoning: true },
       { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
     ],
   },
   {
@@ -2551,15 +2538,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "ionos/openai/gpt-oss-120b", name: "GPT OSS 120B (IONOS)", contextWindow: 128000, reasoning: true },
       { id: "ionos/meta-llama/Llama-3.3-70B-Instruct", name: "Llama-3.3-70B-Instruct (IONOS)", contextWindow: 128000 },
       { id: "ionos/Qwen/Qwen3-Coder-Next", name: "Qwen3 Coder Next (IONOS)", contextWindow: 128000 },
-      { id: "xai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.20-0309-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 1000000 },
-      { id: "xai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4-fast-non-reasoning", name: "X-Ai/Grok-4-Fast-Non-Reasoning", contextWindow: 2000000 },
-      { id: "xai/grok-4.20-0309-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      { id: "xai/grok-latest", name: "Grok Latest (Grok 4.7)", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       {
         id: "databricks/databricks-gpt-oss-20b@eu",
         name: "GPT OSS 20B (Databricks, EU)",
@@ -3405,8 +3384,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "openai/gpt-5-nano", name: "GPT-5 Nano", contextWindow: 400000, reasoning: true },
       { id: "z-ai/glm-5", name: "GLM-5", contextWindow: 204800, reasoning: true },
       { id: "z-ai/glm-5.1", name: "GLM-5.1", contextWindow: 200000, reasoning: true },
-      { id: "x-ai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "x-ai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
+
       { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048576, reasoning: true },
       { id: "google/gemma-4-31b-it", name: "Gemma 4 31B IT", contextWindow: 262144, reasoning: true },
@@ -3462,19 +3440,19 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 },
       { id: "gpt-5-5", name: "GPT-5.5", contextWindow: 272000, reasoning: true },
       { id: "gpt-oss-120b", name: "GPT OSS 120B", contextWindow: 131072, reasoning: true },
-      { id: "grok-4-3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", contextWindow: 1048576, reasoning: true },
       { id: "kimi-k2-6", name: "Kimi-K2.6", contextWindow: 256000, reasoning: true },
       { id: "claude-opus-4-6", name: "Claude Opus 4.6", contextWindow: 200000, reasoning: true },
       { id: "claude-opus-4-7", name: "Claude Opus 4.7", contextWindow: 200000, reasoning: true },
-      { id: "grok-4-1-fast-reasoning", name: "Grok 4.1 Fast (Reasoning)", contextWindow: 2000000, reasoning: true },
+
       { id: "gemini-3-1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5-3-codex", name: "GPT-5.3 Codex", contextWindow: 400000, reasoning: true },
       { id: "gpt-5-4-mini", name: "GPT-5.4 Mini", contextWindow: 400000, reasoning: true },
-      { id: "grok-4-1-fast-non-reasoning", name: "Grok 4.1 Fast (Non-Reasoning)", contextWindow: 2000000 },
+
       { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1048576, reasoning: true },
       { id: "deepseek-v4-pro", name: "DeepSeek v4 Pro", contextWindow: 128000 },
-      { id: "grok-code-fast-1", name: "Grok 4.1 Fast (Reasoning)", contextWindow: 256000, reasoning: true },
+
       { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 200000, reasoning: true },
       { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", contextWindow: 200000, reasoning: true },
     ],
@@ -3584,7 +3562,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gemini-2.5-flash", name: "Google Gemini 2.5 Flash", contextWindow: 1048576, reasoning: true },
       { id: "deepseek-v3.2", name: "DeepSeek V3.2", contextWindow: 163840 },
       { id: "qwen3-next-80b-a3b-instruct", name: "Qwen3 Next 80B A3B Instruct", contextWindow: 262000 },
-      { id: "grok-3-mini", name: "xAI Grok 3 Mini", contextWindow: 131072 },
+
       { id: "llama-guard-4", name: "Meta Llama Guard 4 12B", contextWindow: 131072 },
       { id: "gpt-oss-20b", name: "OpenAI GPT-OSS 20b", contextWindow: 131072, reasoning: true },
       { id: "gpt-5-chat-latest", name: "OpenAI GPT-5 Chat Latest", contextWindow: 128000 },
@@ -3634,13 +3612,13 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-5-pro", name: "OpenAI: GPT-5 Pro", contextWindow: 128000, reasoning: true },
       { id: "llama-3.1-8b-instant", name: "Meta Llama 3.1 8B Instant", contextWindow: 131072 },
       { id: "llama-3.1-8b-instruct-turbo", name: "Meta Llama 3.1 8B Instruct Turbo", contextWindow: 128000 },
-      { id: "grok-4-1-fast-reasoning", name: "xAI Grok 4.1 Fast Reasoning", contextWindow: 2000000, reasoning: true },
+
       { id: "claude-3.7-sonnet", name: "Anthropic: Claude 3.7 Sonnet", contextWindow: 200000, reasoning: true },
-      { id: "grok-3", name: "xAI Grok 3", contextWindow: 131072 },
+
       { id: "kimi-k2-thinking", name: "Kimi K2 Thinking", contextWindow: 256000, reasoning: true },
       { id: "o4-mini", name: "OpenAI o4 Mini", contextWindow: 200000, reasoning: true },
       { id: "claude-4.5-sonnet", name: "Anthropic: Claude Sonnet 4.5", contextWindow: 200000, reasoning: true },
-      { id: "grok-4-fast-non-reasoning", name: "xAI Grok 4 Fast Non-Reasoning", contextWindow: 2000000 },
+
       { id: "o1", name: "OpenAI: o1", contextWindow: 200000, reasoning: true },
       { id: "llama-4-maverick", name: "Meta Llama 4 Maverick 17B 128E", contextWindow: 131072 },
       { id: "llama-4-scout", name: "Meta Llama 4 Scout 17B 16E", contextWindow: 131072 },
@@ -3655,7 +3633,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "deepseek-reasoner", name: "DeepSeek Reasoner", contextWindow: 128000, reasoning: true },
       { id: "sonar-pro", name: "Perplexity Sonar Pro", contextWindow: 200000 },
       { id: "gpt-4.1-mini", name: "OpenAI GPT-4.1 Mini", contextWindow: 1047576 },
-      { id: "grok-4", name: "xAI Grok 4", contextWindow: 256000 },
+
       { id: "sonar-reasoning-pro", name: "Perplexity Sonar Reasoning Pro", contextWindow: 127000, reasoning: true },
       {
         id: "claude-opus-4-1-20250805",
@@ -3676,16 +3654,16 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         reasoning: true,
       },
       { id: "claude-sonnet-4", name: "Anthropic: Claude Sonnet 4", contextWindow: 200000, reasoning: true },
-      { id: "grok-4-1-fast-non-reasoning", name: "xAI Grok 4.1 Fast Non-Reasoning", contextWindow: 2000000 },
+
       { id: "gemma-3-12b-it", name: "Google Gemma 3 12B", contextWindow: 131072 },
       { id: "gemini-2.5-pro", name: "Google Gemini 2.5 Pro", contextWindow: 1048576, reasoning: true },
       { id: "qwen3-32b", name: "Qwen3 32B", contextWindow: 131072, reasoning: true },
-      { id: "grok-code-fast-1", name: "xAI Grok Code Fast 1", contextWindow: 256000, reasoning: true },
+
       { id: "mistral-large-2411", name: "Mistral-Large", contextWindow: 128000 },
       { id: "mistral-small", name: "Mistral Small 3.2", contextWindow: 128000 },
       { id: "o3-mini", name: "OpenAI o3 Mini", contextWindow: 200000, reasoning: true },
       { id: "llama-3.1-8b-instruct", name: "Meta Llama 3.1 8B Instruct", contextWindow: 16384 },
-      { id: "grok-4-fast-reasoning", name: "xAI: Grok 4 Fast Reasoning", contextWindow: 2000000, reasoning: true },
+
       { id: "gpt-5-mini", name: "OpenAI GPT-5 Mini", contextWindow: 400000, reasoning: true },
       { id: "gpt-5.1-codex", name: "OpenAI: GPT-5.1 Codex", contextWindow: 400000, reasoning: true },
       {
@@ -3902,11 +3880,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "openai/gpt-5.1-codex", name: "GPT-5.1 Codex", contextWindow: 400000, reasoning: true },
       { id: "openai/gpt-5-nano", name: "GPT-5 Nano", contextWindow: 400000, reasoning: true },
       { id: "thinkingmachines/inkling", name: "Inkling", contextWindow: 65536, reasoning: true },
-      { id: "xai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-4.20-0309-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 1000000 },
-      { id: "xai/grok-4.20-0309-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      { id: "xai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "zai/glm-4.5-air", name: "GLM-4.5-Air", contextWindow: 131072, reasoning: true },
       { id: "zai/glm-5-turbo", name: "GLM-5-Turbo", contextWindow: 200000, reasoning: true },
       { id: "zai/glm-5.2", name: "GLM-5.2", contextWindow: 1000000, reasoning: true },
@@ -4097,7 +4071,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-5.1", name: "gpt-5.1", contextWindow: 400000, reasoning: true },
       { id: "gpt-5.1-codex-mini", name: "gpt-5.1-codex-mini", contextWindow: 400000, reasoning: true },
       { id: "claude-haiku-4-5-20251001", name: "claude-haiku-4-5-20251001", contextWindow: 200000, reasoning: true },
-      { id: "grok-4-0709", name: "grok-4-0709", contextWindow: 256000 },
+
       {
         id: "gemini-2.5-pro-preview-06-05",
         name: "gemini-2.5-pro-preview-06-05",
@@ -4110,7 +4084,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-5.2-codex", name: "gpt-5.2-codex", contextWindow: 400000, reasoning: true },
       { id: "claude-opus-4-6", name: "claude-opus-4-6", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5-pro", name: "gpt-5-pro", contextWindow: 400000, reasoning: true },
-      { id: "grok-4-1-fast-reasoning", name: "grok-4-1-fast-reasoning", contextWindow: 2000000, reasoning: true },
+
       { id: "gpt-5.2-pro", name: "gpt-5.2-pro", contextWindow: 400000, reasoning: true },
       { id: "claude-opus-4-5-20251101", name: "claude-opus-4-5-20251101", contextWindow: 200000, reasoning: true },
       {
@@ -4121,10 +4095,10 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       },
       { id: "gemini-2.5-flash-lite", name: "gemini-2.5-flash-lite", contextWindow: 1048576, reasoning: true },
       { id: "gpt-5-codex", name: "gpt-5-codex", contextWindow: 400000, reasoning: true },
-      { id: "grok-4-1-fast-non-reasoning", name: "grok-4-1-fast-non-reasoning", contextWindow: 2000000 },
+
       { id: "gemini-2.5-pro", name: "gemini-2.5-pro", contextWindow: 1048576, reasoning: true },
       { id: "gpt-5.2", name: "gpt-5.2", contextWindow: 400000, reasoning: true },
-      { id: "grok-code-fast-1", name: "grok-code-fast-1", contextWindow: 256000, reasoning: true },
+
       { id: "o3-mini", name: "o3-mini", contextWindow: 200000, reasoning: true },
       { id: "gpt-5-mini", name: "gpt-5-mini", contextWindow: 400000, reasoning: true },
       { id: "gpt-5.1-codex", name: "gpt-5.1-codex", contextWindow: 400000, reasoning: true },
@@ -4181,7 +4155,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         reasoning: true,
       },
       { id: "gpt-5-6-sol", name: "GPT-5.6 Sol", contextWindow: 1050000, reasoning: true },
-      { id: "grok-4-6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+
       { id: "gemini-3-1-flash-lite", name: "Gemini 3.1 Flash Lite", contextWindow: 1048576, reasoning: true },
       { id: "glm-4-7-flash:free", name: "GLM-4.7-Flash (Free)", contextWindow: 200000, reasoning: true },
       { id: "gpt-5-5", name: "GPT-5.5", contextWindow: 1050000, reasoning: true },
@@ -4207,7 +4181,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "hy3", name: "Hy3", contextWindow: 256000, reasoning: true },
       { id: "claude-opus-4-8", name: "Claude Opus 4.8", contextWindow: 1000000, reasoning: true },
       { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4-5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "nemotron-3-super-120b-a12b", name: "Nemotron 3 Super 120B A12B", contextWindow: 262144, reasoning: true },
       { id: "step-3-7-flash", name: "Step 3.7 Flash", contextWindow: 256000, reasoning: true },
       { id: "minimax-m3", name: "MiniMax-M3", contextWindow: 1048576, reasoning: true },
@@ -4263,7 +4237,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         contextWindow: 1000000,
         reasoning: true,
       },
-      { id: "~x-ai/grok-latest", name: "xAI: Grok Latest", contextWindow: 500000, reasoning: true },
+
       { id: "openai/o4-mini-high", name: "OpenAI: o4 Mini High", contextWindow: 200000, reasoning: true },
       { id: "openai/gpt-5.5", name: "GPT-5.5", contextWindow: 1050000, reasoning: true },
       { id: "openai/gpt-oss-20b", name: "GPT OSS 20B", contextWindow: 131072, reasoning: true },
@@ -4437,18 +4411,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         contextWindow: 1048576,
         reasoning: true,
       },
-      { id: "x-ai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "x-ai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.20", name: "SpaceXAI: Grok 4.20", contextWindow: 2000000, reasoning: true },
-      { id: "x-ai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      {
-        id: "x-ai/grok-4.20-multi-agent",
-        name: "SpaceXAI: Grok 4.20 Multi-Agent",
-        contextWindow: 2000000,
-        reasoning: true,
-      },
-      { id: "x-ai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       {
         id: "perplexity/sonar-deep-research",
         name: "Perplexity: Sonar Deep Research",
@@ -4959,7 +4922,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-5.5", name: "GPT-5.5", contextWindow: 1050000, reasoning: true },
       { id: "mistral-large-2512", name: "Mistral Large 3", contextWindow: 262144 },
       { id: "gpt-oss-20b", name: "GPT OSS 20B", contextWindow: 131072, reasoning: true },
-      { id: "grok-4-20-beta-0309-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 2000000 },
+
       { id: "mistral-large-latest", name: "Mistral Large (latest)", contextWindow: 128000 },
       { id: "qwen3.8-max", name: "Qwen3.8 Max Preview", contextWindow: 1000000, reasoning: true },
       { id: "kimi-k2.5", name: "Kimi K2.5", contextWindow: 262144, reasoning: true },
@@ -4969,14 +4932,14 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", contextWindow: 1000000, reasoning: true },
       { id: "claude-opus-5-5", name: "Claude Opus 5.5", contextWindow: 1000000, reasoning: true },
       { id: "glm-5.3-fast", name: "GLM-5.3", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4-20-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 2000000 },
+
       { id: "glm-4.5-airx", name: "GLM-4.5 AirX", contextWindow: 128000 },
       { id: "llama-3-70b-instruct", name: "Llama 3 70B Instruct", contextWindow: 8192 },
       { id: "qwen3-235b-a22b-fp8", name: "Qwen3 235B A22B FP8", contextWindow: 40960, reasoning: true },
-      { id: "grok-4-6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+
       { id: "gpt-5.1-codex-mini", name: "GPT-5.1 Codex mini", contextWindow: 400000, reasoning: true },
       { id: "muse-spark-1.2-contributor", name: "Muse Spark 1.2 Contributor", contextWindow: 1048576, reasoning: true },
-      { id: "grok-4-20-beta-0309-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 2000000, reasoning: true },
+
       { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 },
       { id: "qwen3-vl-235b-a22b-instruct", name: "Qwen3 VL 235B A22B Instruct", contextWindow: 262144 },
       { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", contextWindow: 200000, reasoning: true },
@@ -4986,7 +4949,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "seed-1-6-250915", name: "Seed 1.6 (250915)", contextWindow: 256000, reasoning: true },
       { id: "kimi-k3.1-pro", name: "Kimi K3.1 Pro", contextWindow: 1048576, reasoning: true },
       { id: "o3", name: "o3", contextWindow: 200000, reasoning: true },
-      { id: "grok-4-20-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 2000000, reasoning: true },
+
       { id: "qwen3.7-plus", name: "Qwen3.7 Plus", contextWindow: 983616, reasoning: true },
       { id: "kimi-k2.7-code-highspeed", name: "Kimi K2.7 Code Highspeed", contextWindow: 262144, reasoning: true },
       { id: "step-3.7-flash", name: "Step 3.7 Flash", contextWindow: 262144, reasoning: true },
@@ -4996,7 +4959,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "claude-sonnet-5", name: "Claude Sonnet 5", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", contextWindow: 1050000, reasoning: true },
       { id: "seed-1-8-251228", name: "Seed 1.8 (251228)", contextWindow: 256000, reasoning: true },
-      { id: "grok-build-0-1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
+
       { id: "glm-5.2", name: "GLM-5.2", contextWindow: 1048576, reasoning: true },
       {
         id: "qwen3-235b-a22b-thinking-2507",
@@ -5027,7 +4990,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "muse-wonder-1.0", name: "Muse Wonder", contextWindow: 1048576, reasoning: true },
       { id: "qwen3.7-max", name: "Qwen3.7 Max", contextWindow: 1000000, reasoning: true },
       { id: "gemini-3.6-flash", name: "Gemini 3.6 Flash", contextWindow: 1048576, reasoning: true },
-      { id: "grok-4-3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "qwen3.6-flash", name: "Qwen3.6 Flash", contextWindow: 983616, reasoning: true },
       { id: "glm-4.6", name: "GLM-4.6", contextWindow: 204800, reasoning: true },
       { id: "fugu-max", name: "Fugu Max", contextWindow: 1000000, reasoning: true },
@@ -5066,7 +5029,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "ministral-14b-2512", name: "Ministral 14B", contextWindow: 262144 },
       { id: "claude-opus-4-7", name: "Claude Opus 4.7", contextWindow: 1000000, reasoning: true },
       { id: "gemma-4-26b-a4b-it", name: "Gemma 4 26B A4B IT", contextWindow: 262144, reasoning: true },
-      { id: "grok-4-1-fast-reasoning", name: "Grok 4.1 Fast Reasoning", contextWindow: 2000000, reasoning: true },
+
       { id: "kimi-k2.6", name: "Kimi K2.6", contextWindow: 262144, reasoning: true },
       { id: "llama-3.2-11b-instruct", name: "Llama 3.2 11B Instruct", contextWindow: 128000 },
       { id: "gpt-6-astra", name: "GPT-6 Astra", contextWindow: 1050000, reasoning: true },
@@ -5105,7 +5068,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-4.1-mini", name: "GPT-4.1 mini", contextWindow: 1000000 },
       { id: "claude-fable-5-1", name: "Claude Fable 5.1", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.5-pro", name: "GPT-5.5 Pro", contextWindow: 1050000, reasoning: true },
-      { id: "grok-4", name: "Grok 4", contextWindow: 256000 },
+
       { id: "gemini-pro-latest", name: "Gemini Pro Latest", contextWindow: 1048576, reasoning: true },
       { id: "auto", name: "Auto Route", contextWindow: 128000 },
       { id: "claude-opus-5", name: "Claude Opus 5", contextWindow: 1000000, reasoning: true },
@@ -5131,8 +5094,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "qwen3.7-flash", name: "Qwen3.7 Flash", contextWindow: 983616, reasoning: true },
       { id: "qwen3.8-2.4t-a95b", name: "Qwen3.8 2.4T A95B", contextWindow: 1010000, reasoning: true },
       { id: "custom", name: "Custom Model", contextWindow: 128000 },
-      { id: "grok-4-7", name: "Grok 4.7", contextWindow: 524288, reasoning: true },
-      { id: "grok-4-1-fast-non-reasoning", name: "Grok 4.1 Fast Non-Reasoning", contextWindow: 2000000 },
+
       { id: "hy3", name: "Hy3", contextWindow: 262144, reasoning: true },
       { id: "kimi-k2", name: "Kimi K2", contextWindow: 256000 },
       { id: "hy4-preview", name: "Hy4 preview", contextWindow: 1000000, reasoning: true },
@@ -5146,7 +5108,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "qwen3-max", name: "Qwen3 Max", contextWindow: 262144 },
       { id: "minimax-m2.5-highspeed", name: "MiniMax-M2.5-highspeed", contextWindow: 204800, reasoning: true },
       { id: "muse-spark-1.2", name: "Muse Spark 1.2", contextWindow: 1048576, reasoning: true },
-      { id: "grok-4-5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "kimi-k3.1-pro-highspeed", name: "Kimi K3.1 Pro Highspeed", contextWindow: 1048576, reasoning: true },
       { id: "minimax-text-01", name: "MiniMax Text 01", contextWindow: 1000000, reasoning: true },
       { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", contextWindow: 1048576, reasoning: true },
@@ -5327,7 +5289,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         contextWindow: 1000000,
         reasoning: true,
       },
-      { id: "aws-bedrock/grok-4-6", name: "Grok 4.6 (AWS Bedrock)", contextWindow: 500000, reasoning: true },
+
       {
         id: "aws-bedrock/claude-haiku-4-5-20251001",
         name: "Claude Haiku 4.5 (2025-10-01) (AWS Bedrock)",
@@ -5346,7 +5308,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         contextWindow: 1000000,
         reasoning: true,
       },
-      { id: "aws-bedrock/grok-4-3", name: "Grok 4.3 (AWS Bedrock)", contextWindow: 1000000, reasoning: true },
+
       { id: "aws-bedrock/kimi-k3", name: "Kimi K3 (AWS Bedrock)", contextWindow: 1048576, reasoning: true },
       {
         id: "aws-bedrock/claude-opus-4-6",
@@ -5385,7 +5347,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         reasoning: true,
       },
       { id: "aws-bedrock/claude-opus-5", name: "Claude Opus 5 (AWS Bedrock)", contextWindow: 1000000, reasoning: true },
-      { id: "aws-bedrock/grok-4-7", name: "Grok 4.7 (AWS Bedrock)", contextWindow: 524288, reasoning: true },
+
       {
         id: "aws-bedrock/claude-opus-4-8",
         name: "Claude Opus 4.8 (AWS Bedrock)",
@@ -5469,29 +5431,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "meta/muse-spark-1.3", name: "Muse Spark 1.3 (Meta)", contextWindow: 1048576, reasoning: true },
       { id: "meta/muse-spark-1.2", name: "Muse Spark 1.2 (Meta)", contextWindow: 1048576, reasoning: true },
       { id: "ranoai/deepseek-v4-flash", name: "DeepSeek V4 Flash (RanoAI)", contextWindow: 1000000, reasoning: true },
-      {
-        id: "vertex-openai/grok-4-20-non-reasoning",
-        name: "Grok 4.20 Non-Reasoning (Vertex AI (OpenAI-compatible))",
-        contextWindow: 2000000,
-      },
-      {
-        id: "vertex-openai/grok-4-6",
-        name: "Grok 4.6 (Vertex AI (OpenAI-compatible))",
-        contextWindow: 500000,
-        reasoning: true,
-      },
-      {
-        id: "vertex-openai/grok-4-20-reasoning",
-        name: "Grok 4.20 Reasoning (Vertex AI (OpenAI-compatible))",
-        contextWindow: 2000000,
-        reasoning: true,
-      },
-      {
-        id: "vertex-openai/grok-4-7",
-        name: "Grok 4.7 (Vertex AI (OpenAI-compatible))",
-        contextWindow: 524288,
-        reasoning: true,
-      },
+
       {
         id: "vertex-anthropic/claude-sonnet-5",
         name: "Claude Sonnet 5 (Vertex AI (Anthropic))",
@@ -5564,23 +5504,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         contextWindow: 1048576,
         reasoning: true,
       },
-      {
-        id: "xai/grok-4-20-beta-0309-non-reasoning",
-        name: "Grok 4.20 Beta Non-Reasoning (0309) (xAI)",
-        contextWindow: 2000000,
-      },
-      { id: "xai/grok-4-6", name: "Grok 4.6 (xAI)", contextWindow: 500000, reasoning: true },
-      {
-        id: "xai/grok-4-20-beta-0309-reasoning",
-        name: "Grok 4.20 Beta Reasoning (0309) (xAI)",
-        contextWindow: 2000000,
-        reasoning: true,
-      },
-      { id: "xai/grok-build-0-1", name: "Grok Build 0.1 (xAI)", contextWindow: 256000, reasoning: true },
-      { id: "xai/grok-4-3", name: "Grok 4.3 (xAI)", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-4", name: "Grok 4 (xAI)", contextWindow: 256000, reasoning: true },
-      { id: "xai/grok-4-7", name: "Grok 4.7 (xAI)", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4-5", name: "Grok 4.5 (xAI)", contextWindow: 500000, reasoning: true },
+
       {
         id: "google-ai-studio/gemini-3.6-flash",
         name: "Gemini 3.6 Flash (Google AI Studio)",
@@ -6129,18 +6053,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "azure/gpt-5-mini", name: "GPT-5 Mini (Azure)", contextWindow: 400000, reasoning: true },
       { id: "azure/gpt-5.1-codex", name: "GPT-5.1 Codex (Azure)", contextWindow: 400000, reasoning: true },
       { id: "azure/gpt-5-nano", name: "GPT-5 Nano (Azure)", contextWindow: 400000, reasoning: true },
-      { id: "azure-ai-foundry/grok-4-3", name: "Grok 4.3 (Azure AI Foundry)", contextWindow: 20000, reasoning: true },
-      {
-        id: "azure-ai-foundry/grok-4-1-fast-reasoning",
-        name: "Grok 4.1 Fast Reasoning (Azure AI Foundry)",
-        contextWindow: 2000000,
-        reasoning: true,
-      },
-      {
-        id: "azure-ai-foundry/grok-4-1-fast-non-reasoning",
-        name: "Grok 4.1 Fast Non-Reasoning (Azure AI Foundry)",
-        contextWindow: 2000000,
-      },
+
       {
         id: "alibaba/qwen35-397b-a17b",
         name: "Qwen3.5 397B A17B (Alibaba Cloud)",
@@ -6544,13 +6457,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "meta/muse-spark-open", name: "Muse Spark Open", contextWindow: 1048576, reasoning: true },
       { id: "meta/llama-3.1-70b-instruct", name: "Llama 3.1 70B", contextWindow: 128000 },
       { id: "meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B", contextWindow: 128000 },
-      { id: "xai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.20-0309-non-reasoning", name: "Grok 4.20 Non-Reasoning", contextWindow: 1000000 },
-      { id: "xai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.20-0309-reasoning", name: "Grok 4.20", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      { id: "xai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "zai/glm-5.3-flash", name: "GLM-5.3 Flash", contextWindow: 1000000, reasoning: true },
       { id: "zai/glm-4.5-air", name: "GLM-4.5 Air", contextWindow: 128000, reasoning: true },
       { id: "zai/glm-5-turbo", name: "GLM-5 Turbo", contextWindow: 200000, reasoning: true },
@@ -7490,14 +7397,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         contextWindow: 8192,
       },
       { id: "reflection/beam-1.0", name: "Beam 1.0 501B A23B", contextWindow: 1048576, reasoning: true },
-      { id: "x-ai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "x-ai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.20", name: "Grok 4.20", contextWindow: 2000000, reasoning: true },
-      { id: "x-ai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      { id: "x-ai/grok-4.20-multi-agent", name: "Grok 4.20 Multi-Agent", contextWindow: 2000000, reasoning: true },
-      { id: "x-ai/grok-latest", name: "Grok Latest", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "poolside/laguna-s-2.1:thinking", name: "Laguna S 2.1 Thinking", contextWindow: 1048576, reasoning: true },
       { id: "poolside/laguna-s-2.1", name: "Laguna S 2.1", contextWindow: 1048576, reasoning: true },
       { id: "amazon/nova-2-lite-v1", name: "Amazon Nova 2 Lite", contextWindow: 1000000 },
@@ -8177,8 +8077,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "Qwen/Qwen3-VL-30B-A3B-Instruct", name: "Qwen3-VL 30B-A3B Instruct", contextWindow: 16384 },
       { id: "Qwen/Qwen3.8-27B", name: "Qwen3.8 27B", contextWindow: 262144, reasoning: true },
       { id: "Qwen/Qwen3.6-35B-A3B-FP8", name: "Qwen 3.6 35B A3B FP8", contextWindow: 262144, reasoning: true },
-      { id: "x-ai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
+
       { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash-Lite", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", contextWindow: 1048576, reasoning: true },
@@ -8386,9 +8285,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
     baseUrl: "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com/openai/v1",
     models: [
       { id: "openai.gpt-oss-20b", name: "GPT OSS 20B", contextWindow: 128000, reasoning: true },
-      { id: "xai.grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "xai.grok-4.20-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 1000000 },
-      { id: "xai.grok-4.20-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 1000000, reasoning: true },
+
       { id: "meta.llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B Instruct", contextWindow: 192000 },
       { id: "openai.gpt-oss-120b", name: "GPT OSS 120B", contextWindow: 128000, reasoning: true },
       {
@@ -8396,7 +8293,6 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         name: "Llama 4 Maverick 17B Instruct",
         contextWindow: 512000,
       },
-      { id: "xai.grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
     ],
   },
   {
@@ -8440,12 +8336,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "z-ai/glm-5v-turbo", name: "GLM-5V-Turbo", contextWindow: 200000, reasoning: true },
       { id: "z-ai/glm-5.3-flashx", name: "GLM-5.3-FlashX", contextWindow: 1000000, reasoning: true },
       { id: "z-ai/glm-5.1", name: "GLM-5.1", contextWindow: 200000, reasoning: true },
-      { id: "x-ai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "x-ai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.20", name: "Grok 4.20 (Reasoning)", contextWindow: 2000000, reasoning: true },
-      { id: "x-ai/grok-4.1-fast", name: "Grok 4.1 Fast", contextWindow: 2000000 },
-      { id: "x-ai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.7-flash", name: "Gemini 3.7 Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.6-flash", name: "Gemini 3.6 Flash", contextWindow: 1048576, reasoning: true },
@@ -8629,12 +8520,12 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "qwen3.8-max", name: "Qwen3.8 Max", contextWindow: 983616, reasoning: true },
       { id: "gpt-5.4-mini", name: "GPT-5.4 mini", contextWindow: 400000, reasoning: true },
       { id: "qwen3.8-27b", name: "Qwen3.8 27B", contextWindow: 262144, reasoning: true },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "claude-sonnet-5", name: "Claude Sonnet 5", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", contextWindow: 1000000, reasoning: true },
       { id: "glm-5.2", name: "GLM-5.2", contextWindow: 1000000, reasoning: true },
       { id: "gpt-oss-120b", name: "GPT OSS 120B", contextWindow: 128000, reasoning: true },
-      { id: "grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+
       { id: "gpt-5.4-nano", name: "GPT-5.4 nano", contextWindow: 400000, reasoning: true },
       { id: "gpt-5.4", name: "GPT-5.4", contextWindow: 1050000, reasoning: true },
       { id: "gemini-3-flash-preview", name: "Gemini 3 Flash Preview", contextWindow: 1048576, reasoning: true },
@@ -8659,7 +8550,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gpt-5.5-pro", name: "GPT-5.5 Pro", contextWindow: 1050000, reasoning: true },
       { id: "sonar-reasoning-pro", name: "Sonar Reasoning Pro", contextWindow: 128000, reasoning: true },
       { id: "claude-opus-5", name: "Claude Opus 5", contextWindow: 1000000, reasoning: true },
-      { id: "grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
+
       { id: "muse-spark-1.3", name: "Muse Spark 1.3", contextWindow: 1048576, reasoning: true },
       { id: "gpt-5.6-sol", name: "GPT-5.6 Sol", contextWindow: 1000000, reasoning: true },
       { id: "qwen3.6-35b-a3b", name: "Qwen3.6 35B-A3B", contextWindow: 262144, reasoning: true },
@@ -8673,7 +8564,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", contextWindow: 1048576, reasoning: true },
       { id: "minimax-m3", name: "MiniMax-M3", contextWindow: 1000000, reasoning: true },
       { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (latest)", contextWindow: 200000, reasoning: true },
     ],
   },
@@ -8802,9 +8693,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         reasoning: true,
       },
       { id: "deepseek/deepseek-v4-pro", name: "DeepSeek V4 Pro", contextWindow: 1000000, reasoning: true },
-      { id: "grok/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "grok/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "grok/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "orcarouter/fusion", name: "OrcaRouter Fusion", contextWindow: 1000000, reasoning: true },
       { id: "orcarouter/fusion-mini", name: "OrcaRouter Fusion Mini", contextWindow: 1000000, reasoning: true },
       { id: "orcarouter/fusion-flash", name: "OrcaRouter Fusion Flash", contextWindow: 200000, reasoning: true },
@@ -8890,9 +8779,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "openai/gpt-6-astra", name: "GPT-6 Astra", contextWindow: 1050000, reasoning: true },
       { id: "openai/gpt-5.6-luna", name: "GPT-5.6 Luna", contextWindow: 1050000, reasoning: true },
       { id: "openai/gpt-5.6-sol", name: "GPT-5.6 Sol", contextWindow: 1050000, reasoning: true },
-      { id: "xai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "perplexity/deepseek-v4-pro-0813", name: "DeepSeek V4 Pro 0813", contextWindow: 1000000, reasoning: true },
       { id: "perplexity/glm-5.3-flash", name: "GLM-5.3-Flash", contextWindow: 1000000, reasoning: true },
       { id: "perplexity/sonar", name: "Sonar", contextWindow: 128000 },
@@ -8988,10 +8875,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "openai/gpt-5-mini", name: "GPT-5-mini", contextWindow: 400000, reasoning: true },
       { id: "openai/gpt-5-nano", name: "GPT-5-nano", contextWindow: 400000, reasoning: true },
       { id: "poetools/claude-code", name: "claude-code", reasoning: true },
-      { id: "xai/grok-3-mini", name: "Grok 3 Mini", contextWindow: 131072, reasoning: true },
-      { id: "xai/grok-3", name: "Grok 3", contextWindow: 131072 },
-      { id: "xai/grok-code-fast-1", name: "Grok Code Fast 1", contextWindow: 256000, reasoning: true },
-      { id: "xai/grok-4.20-multi-agent", name: "Grok-4.20-Multi-Agent", contextWindow: 128000, reasoning: true },
+
       { id: "google/gemini-3.7-flash", name: "Gemini-3.7-Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.6-flash", name: "Gemini-3.6-Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3-flash", name: "Gemini-3-Flash", contextWindow: 1048576, reasoning: true },
@@ -9074,8 +8958,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "mistralai/mixtral-8x22b-instruct", name: "Mixtral 8x22B Instruct", contextWindow: 65536 },
       { id: "mistralai/mistral-nemo", name: "Mistral Nemo", contextWindow: 131072 },
       { id: "mistralai/mistral-small-2603", name: "Mistral Small 4", contextWindow: 262144, reasoning: true },
-      { id: "x-ai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
+
       { id: "google/gemini-3.7-flash", name: "Gemini 3.7 Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.6-flash", name: "Gemini 3.6 Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3-flash-preview", name: "Gemini 3 Flash Preview", contextWindow: 1048576, reasoning: true },
@@ -9214,7 +9097,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gemini-3.7-flash", name: "Gemini 3.7 Flash", contextWindow: 1048576, reasoning: true },
       { id: "deepseek-v4-flash-0731", name: "DeepSeek V4 Flash 0731", contextWindow: 1048576, reasoning: true },
       { id: "kimi-k2.6@eu", name: "Kimi K2.6 (EU)", contextWindow: 256000, reasoning: true },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "claude-sonnet-5", name: "Claude Sonnet 5", contextWindow: 1000000, reasoning: true },
       { id: "gpt-5.6-terra", name: "GPT-5.6 Terra", contextWindow: 1050000, reasoning: true },
       { id: "claude-sonnet-4-5@eu", name: "Claude Sonnet 4.5 (latest) (EU)", contextWindow: 1000000 },
@@ -9225,7 +9108,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "mimo-v2.6-pro", name: "MiMo-V2.6-Pro", contextWindow: 1048576, reasoning: true },
       { id: "gpt-6.1-terra", name: "GPT-6.1 Terra", contextWindow: 1050000, reasoning: true },
       { id: "ling-2.6-1t", name: "ling-2.6-1t", contextWindow: 262144 },
-      { id: "grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+
       { id: "nemotron-3-nano-omni", name: "nemotron-3-nano-omni", contextWindow: 300000, reasoning: true },
       { id: "gpt-4o-mini@eu", name: "GPT-4o mini (EU)", contextWindow: 128000 },
       { id: "gpt-5.4-nano", name: "GPT-5.4 nano", contextWindow: 400000, reasoning: true },
@@ -9257,7 +9140,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048576, reasoning: true },
       { id: "mimo-v2.5-pro", name: "MiMo-V2.5-Pro", contextWindow: 1048576 },
       { id: "gemini-3.5-flash-lite@eu", name: "Gemini 3.5 Flash Lite (EU)", contextWindow: 1048576, reasoning: true },
-      { id: "grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
+
       { id: "kimi-k3", name: "Kimi K3", contextWindow: 1048576, reasoning: true },
       { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", contextWindow: 1048576, reasoning: true },
       { id: "claude-opus-5@eu", name: "Claude Opus 5 (EU)", contextWindow: 1000000, reasoning: true },
@@ -9320,7 +9203,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "claude-opus-5", name: "Claude Opus 5", contextWindow: 1000000, reasoning: true },
       { id: "gpt-4.1-nano@eu", name: "GPT-4.1 nano (EU)", contextWindow: 1047576 },
       { id: "gpt-5.6-luna@eu", name: "GPT-5.6 Luna (EU)", contextWindow: 1050000, reasoning: true },
-      { id: "grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000 },
+
       { id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash", contextWindow: 1048576, reasoning: true },
       { id: "glm-5.1", name: "GLM-5.1", contextWindow: 200000, reasoning: true },
       {
@@ -9356,7 +9239,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "qwen3.5-2b", name: "Qwen3.5 2B", contextWindow: 262144, reasoning: true },
       { id: "deepseek-v4-pro-0813@eu", name: "DeepSeek V4 Pro 0813 (EU)", contextWindow: 1048576, reasoning: true },
       { id: "nemotron-3-nano-omni@eu", name: "nemotron-3-nano-omni@eu", contextWindow: 300000, reasoning: true },
-      { id: "grok-4.2-beta", name: "Grok 4.20 (Reasoning)", contextWindow: 2000000 },
+
       { id: "gemini-3.5-flash", name: "Gemini 3.5 Flash", contextWindow: 1048576, reasoning: true },
       { id: "qwen3.5-35b-a3b", name: "Qwen3.5 35B-A3B", contextWindow: 262144, reasoning: true },
       { id: "gpt-5.1@eu", name: "GPT-5.1 (EU)", contextWindow: 400000, reasoning: true },
@@ -9369,7 +9252,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "mistral-medium-3-5", name: "Mistral Medium 3.5", contextWindow: 262144, reasoning: true },
       { id: "gemini-2.5-pro@eu", name: "Gemini 2.5 Pro (EU)", contextWindow: 1048576, reasoning: true },
       { id: "mistral-small-2603@eu", name: "Mistral Small 4 (EU)", contextWindow: 256000, reasoning: true },
-      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (latest)", contextWindow: 200000 },
       {
         id: "nemotron-3-nano-omni-30b-a3b-reasoning",
@@ -9726,7 +9609,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "z-ai/glm-5.2", name: "GLM-5.2", contextWindow: 1000000, reasoning: true },
       { id: "z-ai/glm-5.3", name: "GLM-5.3", contextWindow: 1000000, reasoning: true },
       { id: "mistralai/mistral-large-4-0", name: "Mistral Large 4", contextWindow: 1048576, reasoning: true },
-      { id: "x-ai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+
       { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048576, reasoning: true },
       { id: "google/gemini-3.5-flash-lite", name: "Gemini 3.5 Flash Lite", contextWindow: 1048576, reasoning: true },
@@ -9859,13 +9742,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
         reasoning: true,
       },
       { id: "xiaomi-mimo/mimo-v2.6-flash", name: "MiMo-V2.6-Flash", contextWindow: 1048576, reasoning: true },
-      { id: "xai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.20-0309-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 1000000 },
-      { id: "xai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "xai/grok-4.20-0309-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 1000000, reasoning: true },
-      { id: "xai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      { id: "xai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       { id: "zai/glm-5.3-flash", name: "GLM-5.3-Flash", contextWindow: 1000000, reasoning: true },
       { id: "zai/glm-4.5-air", name: "GLM-4.5-Air", contextWindow: 131072, reasoning: true },
       { id: "zai/glm-5-turbo", name: "GLM-5-Turbo", contextWindow: 200000, reasoning: true },
@@ -10520,27 +10397,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       },
       { id: "deepseek/deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash", contextWindow: 1048576, reasoning: true },
       { id: "deepseek/deepseek-v4-pro", name: "DeepSeek V4 Pro", contextWindow: 1000000, reasoning: true },
-      { id: "spacexai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "spacexai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      {
-        id: "spacexai/grok-4.20-multi-agent-beta",
-        name: "Grok 4.20 Multi Agent Beta",
-        contextWindow: 2000000,
-        reasoning: true,
-      },
-      { id: "spacexai/grok-4.20-non-reasoning-beta", name: "Grok 4.20 Beta Non-Reasoning", contextWindow: 2000000 },
-      { id: "spacexai/grok-4.20-non-reasoning", name: "Grok 4.20 Non-Reasoning", contextWindow: 2000000 },
-      { id: "spacexai/grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "spacexai/grok-4.20-reasoning", name: "Grok 4.20 Reasoning", contextWindow: 2000000, reasoning: true },
-      {
-        id: "spacexai/grok-4.20-reasoning-beta",
-        name: "Grok 4.20 Beta Reasoning",
-        contextWindow: 2000000,
-        reasoning: true,
-      },
-      { id: "spacexai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-      { id: "spacexai/grok-4.20-multi-agent", name: "Grok 4.20 Multi-Agent", contextWindow: 2000000, reasoning: true },
-      { id: "spacexai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+
       {
         id: "nvidia/nemotron-3.5-super-vl",
         name: "NVIDIA Nemotron 3.5 Super VL",
@@ -10889,12 +10746,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "z-ai/glm-4.7-flash-free", name: "GLM 4.7 Flash (Free)", contextWindow: 200000, reasoning: true },
       { id: "z-ai/glm-5.1", name: "GLM 5.1", contextWindow: 200000, reasoning: true },
       { id: "z-ai/glm-4.6v", name: "GLM 4.6V", contextWindow: 200000, reasoning: true },
-      { id: "x-ai/grok-4.2-fast-non-reasoning", name: "Grok 4.2 Fast Non Reasoning", contextWindow: 2000000 },
-      { id: "x-ai/grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "x-ai/grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000 },
-      { id: "x-ai/grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
-      { id: "x-ai/grok-4.2-fast", name: "Grok 4.2 Fast", contextWindow: 2000000 },
+
       { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1048000, reasoning: true },
       { id: "google/gemini-3-flash-preview", name: "Gemini 3 Flash Preview", contextWindow: 1048000, reasoning: true },
       { id: "google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro Preview", contextWindow: 1048000, reasoning: true },
@@ -11037,7 +10889,8 @@ export function parseModelsResponse(payload: unknown): string[] {
   const ids = data
     .map((entry) => (entry && typeof entry === "object" ? (entry as { id?: unknown }).id : undefined))
     .filter((id): id is string => typeof id === "string" && id.trim() !== "")
-    .map((id) => id.trim());
+    .map((id) => id.trim())
+    .filter((id) => !/grok/i.test(id));
   return [...new Set(ids)].sort();
 }
 
