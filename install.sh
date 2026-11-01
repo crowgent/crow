@@ -21,7 +21,7 @@ Install Crow from GitHub Releases.
 
 Usage:
   curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash -s -- --version 1.1.4
+  curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash -s -- --version 1.1.7
   bash install.sh --binary /path/to/crow
 
 Options:
@@ -249,13 +249,19 @@ resolve_release_version() {
     return
   fi
 
-  local tag
-  tag=$(curl -fsSL "${RELEASES_API}/latest" \
+  local response tag
+  if ! response=$(curl -fsSL "${RELEASES_API}/latest"); then
+    echo "Failed to fetch the latest Crow release from ${RELEASES_API}/latest." >&2
+    echo "No release may be published yet. See https://github.com/${REPO}/releases" >&2
+    exit 1
+  fi
+  tag=$(printf '%s' "$response" \
     | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
     | head -n 1)
   RESOLVED_VERSION="${tag#crow@}"
   if [[ -z "$RESOLVED_VERSION" ]]; then
     echo "Failed to resolve the latest Crow release version." >&2
+    echo "No release may be published yet. See https://github.com/${REPO}/releases" >&2
     exit 1
   fi
   RELEASE_BASE_URL="https://github.com/${REPO}/releases/latest/download"
