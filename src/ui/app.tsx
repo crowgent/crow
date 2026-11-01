@@ -456,7 +456,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [messages, setMessages] = useState<ChatEntry[]>(() => agent.getChatEntries());
   const [streamContent, setStreamContent] = useState("");
   const [streamReasoning, setStreamReasoning] = useState("");
-  const [thoughtSummary, setThoughtSummary] = useState<{ durationMs: number; preview: string } | null>(null);
+  const [thoughtSummary, setThoughtSummary] = useState<{ durationMs: number } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [liveTurnSourceLabel, setLiveTurnSourceLabel] = useState<string | null>(null);
   const [model, setModel] = useState(agent.getModel());
@@ -1410,7 +1410,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     const startedAt = startTimeRef.current;
     setThoughtSummary({
       durationMs: startedAt > 0 ? Date.now() - startedAt : 0,
-      preview: thoughtPreview(reasoningAccRef.current),
     });
   }, []);
 
@@ -3681,12 +3680,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               )}
               {thoughtSummary && (
                 <box paddingLeft={3} marginTop={1} flexShrink={0}>
-                  <ThoughtLine
-                    t={t}
-                    durationMs={thoughtSummary.durationMs}
-                    preview={thoughtSummary.preview}
-                    fullText={streamReasoning}
-                  />
+                  <ThoughtLine t={t} durationMs={thoughtSummary.durationMs} fullText={streamReasoning} />
                 </box>
               )}
               {/* Active tool calls — pending inline */}
@@ -3723,10 +3717,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               )}
               {/* Waiting indicator */}
               {isProcessing && thoughtSummary == null && !streamContent && activeToolCalls.length === 0 && (
-                <ThinkingSpinner
-                  t={t}
-                  label={streamReasoning ? `Thinking: ${thoughtPreview(streamReasoning)}` : "Thinking"}
-                />
+                <ThinkingSpinner t={t} label="Thinking" />
               )}
               {/* Plan questions panel — inline, OpenCode-style */}
               {showPlanPanel && <PlanQuestionsPanel t={t} questions={planQuestions} state={pqs} />}
@@ -4551,12 +4542,7 @@ function MessageView({
         <box paddingLeft={3} marginTop={1} flexShrink={0} flexDirection="column">
           {entry.sourceLabel ? <text fg={t.textMuted}>{entry.sourceLabel}</text> : null}
           {entry.thought ? (
-            <ThoughtLine
-              t={t}
-              durationMs={entry.thought.durationMs}
-              preview={thoughtPreview(entry.thought.text)}
-              fullText={entry.thought.text}
-            />
+            <ThoughtLine t={t} durationMs={entry.thought.durationMs} fullText={entry.thought.text} />
           ) : null}
           <Markdown content={entry.content} t={t} />
         </box>
@@ -4900,12 +4886,6 @@ function formatLspSeverity(severity?: number): string {
 
 const THINKING_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-function thoughtPreview(text: string): string {
-  const first = text.split("\n").find((line) => line.trim().length > 0) ?? "";
-  const trimmed = first.trim();
-  return trimmed.length > 80 ? `${trimmed.slice(0, 80)}…` : trimmed;
-}
-
 function formatThoughtDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
   if (totalSeconds < 60) return `${totalSeconds}s`;
@@ -4914,17 +4894,7 @@ function formatThoughtDuration(ms: number): string {
   return `${minutes}m ${seconds.toString().padStart(2, "0")}s`;
 }
 
-function ThoughtLine({
-  t,
-  durationMs,
-  preview,
-  fullText,
-}: {
-  t: Theme;
-  durationMs: number;
-  preview: string;
-  fullText: string;
-}) {
+function ThoughtLine({ t, durationMs, fullText }: { t: Theme; durationMs: number; fullText: string }) {
   const [expanded, setExpanded] = useState(false);
   const expandable = fullText.trim().length > 0;
   return (
@@ -4932,13 +4902,13 @@ function ThoughtLine({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: click toggles the expanded thinking text */}
       <box flexShrink={0} onMouseUp={expandable ? () => setExpanded((value) => !value) : undefined}>
         <text fg={t.textMuted}>
-          Thought{preview ? `: ${preview}` : ""} · {formatThoughtDuration(durationMs)}
-          {expandable ? (expanded ? " ▾" : " ▸") : ""}
+          Thought • {formatThoughtDuration(durationMs)}
+          {expandable ? (expanded ? " · click to collapse" : " · click to expand") : ""}
         </text>
       </box>
       {expanded && (
         <box flexShrink={0}>
-          <text fg={t.textMuted}>{fullText}</text>
+          <Markdown content={fullText} t={t} />
         </box>
       )}
     </box>
