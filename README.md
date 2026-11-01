@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/superagent-ai/grok-cli/actions/workflows/typecheck.yml/badge.svg)](https://github.com/superagent-ai/grok-cli/actions/workflows/typecheck.yml)
 [![npm](https://img.shields.io/npm/v/grok-dev.svg)](https://www.npmjs.com/package/grok-dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Bun](https://img.shields.io/badge/Bun-1.x-000000?logo=bun&logoColor=white)](https://bun.sh/)
 
@@ -128,8 +127,8 @@ Schedules let Grok run a headless prompt on a recurring schedule or once. Ask
 for it in natural language, for example:
 
 ```text
-Create a schedule named daily-changelog-update that runs every weekday at 9am
-and updates CHANGELOG.md from the latest merged commits.
+Create a schedule named daily-standup-summary that runs every weekday at 9am
+and summarizes the latest merged commits.
 ```
 
 Recurring schedules require the background daemon:
@@ -489,8 +488,3 @@ bun run lint
 
 "Grok" is a registered trademark of xAI Corp. This project is not affiliated with, endorsed by, or sponsored by xAI Corp. All trademarks belong to their respective owners.
 
----
-
-## License
-
-MIT

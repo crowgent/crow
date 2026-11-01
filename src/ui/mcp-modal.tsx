@@ -1,7 +1,5 @@
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { type RefObject, useEffect, useRef } from "react";
-import type { McpCatalogEntry } from "../mcp/catalog";
-import { toMcpServerId } from "../mcp/validate";
 import type { McpServerConfig } from "../utils/settings";
 import type { McpBrowserRow, McpEditorDraft, McpEditorField } from "./mcp-modal-types";
 import type { Theme } from "./theme";
@@ -12,13 +10,8 @@ function bottomAlignedModalTop(height: number, panelHeight: number): number {
   return Math.max(2, Math.floor((height - panelHeight) / 2));
 }
 
-export function buildMcpBrowseRows(
-  servers: McpServerConfig[],
-  catalog: McpCatalogEntry[],
-  query: string,
-): McpBrowserRow[] {
+export function buildMcpBrowseRows(servers: McpServerConfig[], query: string): McpBrowserRow[] {
   const q = query.trim().toLowerCase();
-  const catalogById = new Map(catalog.map((entry) => [toMcpServerId(entry.id), entry] as const));
   const filteredServers = q
     ? servers.filter(
         (server) =>
@@ -27,28 +20,16 @@ export function buildMcpBrowseRows(
           server.transport.toLowerCase().includes(q),
       )
     : servers;
-  const savedIds = new Set(servers.map((server) => toMcpServerId(server.id || server.label)));
-  const filteredCatalog = (
-    q
-      ? catalog.filter(
-          (entry) =>
-            entry.name.toLowerCase().includes(q) ||
-            entry.id.toLowerCase().includes(q) ||
-            entry.description.toLowerCase().includes(q),
-        )
-      : catalog
-  ).filter((entry) => !savedIds.has(toMcpServerId(entry.id)));
 
   return [
-    ...filteredServers.map((server) => {
-      const catalogEntry = catalogById.get(toMcpServerId(server.id || server.label));
-      return {
-        kind: "server",
-        server,
-        description: catalogEntry?.description ?? "Custom MCP server",
-      } satisfies McpBrowserRow;
-    }),
-    ...filteredCatalog.map((entry) => ({ kind: "catalog", entry }) satisfies McpBrowserRow),
+    ...filteredServers.map(
+      (server) =>
+        ({
+          kind: "server",
+          server,
+          description: "Custom MCP server",
+        }) satisfies McpBrowserRow,
+    ),
     { kind: "add" },
   ];
 }
@@ -76,8 +57,6 @@ export function McpBrowserModal({
 
     if (selected.kind === "server") {
       listRef.current?.scrollChildIntoView(`mcp-server-${selected.server.id}`);
-    } else if (selected.kind === "catalog") {
-      listRef.current?.scrollChildIntoView(`mcp-catalog-${selected.entry.id}`);
     } else {
       listRef.current?.scrollChildIntoView("mcp-add");
     }
@@ -139,27 +118,6 @@ export function McpBrowserModal({
                     <text fg={row.server.enabled ? t.diffAddedFg : t.textMuted}>{row.server.transport}</text>
                   </box>
                   <text fg={t.textMuted}>{row.description}</text>
-                </box>
-              );
-            }
-
-            if (row.kind === "catalog") {
-              return (
-                <box
-                  key={`catalog-${row.entry.id}`}
-                  id={`mcp-catalog-${row.entry.id}`}
-                  backgroundColor={selected ? t.selectedBg : undefined}
-                  paddingLeft={2}
-                  paddingRight={2}
-                >
-                  <box flexDirection="row" justifyContent="space-between">
-                    <text fg={selected ? t.selected : t.text}>
-                      {"□ "}
-                      {row.entry.name}
-                    </text>
-                    <text fg={t.textMuted}>{"Popular"}</text>
-                  </box>
-                  <text fg={t.textMuted}>{row.entry.description}</text>
                 </box>
               );
             }

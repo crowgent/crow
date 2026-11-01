@@ -1,10 +1,6 @@
-import type { McpCatalogEntry } from "../mcp/catalog";
 import type { McpRemoteTransport, McpServerConfig } from "../utils/settings";
 
-export type McpBrowserRow =
-  | { kind: "server"; server: McpServerConfig; description?: string }
-  | { kind: "catalog"; entry: McpCatalogEntry }
-  | { kind: "add" };
+export type McpBrowserRow = { kind: "server"; server: McpServerConfig; description?: string } | { kind: "add" };
 
 export type McpEditorField = "transport" | "label" | "url" | "headers" | "command" | "args" | "cwd" | "env";
 

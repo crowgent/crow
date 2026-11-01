@@ -13,7 +13,6 @@ import {
   MODELS,
   normalizeModelId,
 } from "../grok/models";
-import { POPULAR_MCP_CATALOG } from "../mcp/catalog";
 import { parseEnvLines, parseHeaderLines } from "../mcp/parse-headers";
 import { toMcpServerId, validateMcpServerConfig } from "../mcp/validate";
 import { createTelegramBridge, type TelegramBridgeHandle } from "../telegram/bridge";
@@ -817,7 +816,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     : MODELS;
   const filteredModelIds = filteredModels.map((m) => m.id);
   const filteredSlashItems = filterSlashMenuItems(SLASH_MENU_ITEMS, slashSearchQuery);
-  const mcpRows = buildMcpBrowseRows(mcpServers, POPULAR_MCP_CATALOG, mcpSearchQuery);
+  const mcpRows = buildMcpBrowseRows(mcpServers, mcpSearchQuery);
   const mcpEditorFields = mcpEditorDraft.transport === "stdio" ? MCP_STDIO_FIELDS : MCP_REMOTE_FIELDS;
   const agentRows = useMemo(
     () => buildSubagentBrowseRows(subAgents, agentsSearchQuery),
@@ -990,38 +989,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     setShowMcpEditor(true);
     setShowMcpModal(true);
   }, []);
-
-  const openCatalogMcp = useCallback(
-    (entry: (typeof POPULAR_MCP_CATALOG)[number]) => {
-      const existing = mcpServers.find((server) => toMcpServerId(server.id) === toMcpServerId(entry.id));
-      if (existing) {
-        openMcpEditor(
-          {
-            label: existing.label,
-            transport: existing.transport,
-            url: existing.url ?? "",
-            headersText: Object.entries(existing.headers ?? {})
-              .map(([key, value]) => `${key}: ${value}`)
-              .join("\n"),
-            command: existing.command ?? "",
-            argsText: (existing.args ?? []).join("\n"),
-            cwd: existing.cwd ?? "",
-            envText: Object.entries(existing.env ?? {})
-              .map(([key, value]) => `${key}=${value}`)
-              .join("\n"),
-          },
-          existing.id,
-        );
-        return;
-      }
-      openMcpEditor({
-        ...createEmptyMcpEditorDraft(),
-        label: entry.name,
-        transport: entry.starterTransport ?? "stdio",
-      });
-    },
-    [mcpServers, openMcpEditor],
-  );
 
   const editSavedMcp = useCallback(
     (server: McpServerConfig) => {
@@ -2756,8 +2723,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         if (key.name === "return") {
           if (row?.kind === "server") {
             toggleSavedMcp(row.server);
-          } else if (row?.kind === "catalog") {
-            openCatalogMcp(row.entry);
           } else {
             openMcpEditor(createEmptyMcpEditorDraft());
           }
@@ -3293,7 +3258,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       mcpRows,
       modelPickerIndex,
       openApiKeyModal,
-      openCatalogMcp,
       openMcpEditor,
       replacePasteBlocks,
       openSubagentEditor,
