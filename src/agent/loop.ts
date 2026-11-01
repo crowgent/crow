@@ -6,7 +6,7 @@ import { withPermissionGate } from "../crow/permission-gate";
 import type { PermissionEffect, PermissionResolver } from "../crow/permissions";
 import { withToolOutputCap } from "../crow/tool-output-cap";
 import { toolSetToBatchTools } from "../crow/tool-schemas";
-import { createTools } from "../crow/tools";
+import { createTools, type QuestionItem } from "../crow/tools";
 import type { executeEventHooks } from "../hooks/index";
 import type {
   PostCompactHookInput,
@@ -18,11 +18,16 @@ import type {
 } from "../hooks/types";
 import { buildMcpToolSet } from "../mcp/runtime";
 import {
+  addTodo,
   appendCompaction,
   appendMessages,
   getNextMessageSequence,
+  getSessionTotalTokens,
+  listTodos,
   recordThought,
+  removeTodo,
   type SessionStore,
+  setTodoStatus,
 } from "../storage/index";
 import type { BashTool } from "../tools/bash";
 import type { ScheduleManager } from "../tools/schedule";
@@ -114,6 +119,8 @@ export interface LoopContext {
   updateTurnDraft(text: string): void;
   deleteTurnDraft(): void;
   abandonPersistedTurn(userSeq: number | null): void;
+  askQuestion(questions: QuestionItem[], abortSignal?: AbortSignal): Promise<string[]>;
+  sessionTokenBudget: number;
 }
 
 function getCompactionSettings(maxTokens: number): CompactionSettings {
@@ -220,6 +227,8 @@ async function* processMessageBatchTurn(
         agentDefinitions: loadAgentDefinitions(ctx.bash.getCwd()),
         sendTelegramFile: ctx.sendTelegramFile ?? undefined,
         sessionId: ctx.session?.id ?? undefined,
+        askQuestion: (questions, abortSignal) => ctx.askQuestion(questions, abortSignal),
+        todos: { list: listTodos, add: addTodo, setStatus: setTodoStatus, remove: removeTodo },
       });
       let tools: ToolSet = runtime.modelInfo?.supportsClientTools === false ? {} : baseTools;
       if (ctx.mode === "agent" && runtime.modelInfo?.supportsClientTools !== false) {
@@ -539,6 +548,19 @@ export async function* processMessage(
       let lastDraftWrite = 0;
       const activeToolCalls: ToolCall[] = [];
 
+      if (
+        ctx.sessionTokenBudget > 0 &&
+        ctx.session &&
+        getSessionTotalTokens(ctx.session.id) >= ctx.sessionTokenBudget
+      ) {
+        const notice = `Session token budget (${ctx.sessionTokenBudget} tokens) reached. This turn was not run. Raise the budget with /budget or in user settings.`;
+        yield { type: "content", content: notice };
+        appendCompletedTurn(ctx, userModelMessage, [{ role: "assistant", content: notice }], undefined, turnUserSeq);
+        ctx.deleteTurnDraft();
+        yield { type: "done" };
+        return;
+      }
+
       try {
         const settings = attemptedOverflowRecovery
           ? relaxCompactionSettings(getCompactionSettings(ctx.maxTokens))
@@ -566,6 +588,8 @@ export async function* processMessage(
           agentDefinitions: loadAgentDefinitions(ctx.bash.getCwd()),
           sendTelegramFile: ctx.sendTelegramFile ?? undefined,
           sessionId: ctx.session?.id ?? undefined,
+          askQuestion: (questions, abortSignal) => ctx.askQuestion(questions, abortSignal),
+          todos: { list: listTodos, add: addTodo, setStatus: setTodoStatus, remove: removeTodo },
         });
         let tools: ToolSet = runtime.modelInfo?.supportsClientTools === false ? {} : baseTools;
         if (ctx.mode === "agent" && runtime.modelInfo?.supportsClientTools !== false) {

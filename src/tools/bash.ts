@@ -369,6 +369,10 @@ export class BashTool {
     return this.cwd;
   }
 
+  setCwd(cwd: string): void {
+    this.cwd = cwd;
+  }
+
   getSandboxMode(): SandboxMode {
     return this.sandboxMode;
   }

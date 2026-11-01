@@ -531,6 +531,79 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       agent.setPermissionResolver(null);
     };
   }, [agent, advancePermissionQueue]);
+  const [pendingQuestion, setPendingQuestion] = useState<{
+    question: string;
+    options: string[];
+    selected: number;
+  } | null>(null);
+  const questionQueueRef = useRef<
+    Array<{
+      questions: Array<{ question: string; options: string[] }>;
+      answers: string[];
+      index: number;
+      resolve: (answers: string[]) => void;
+      reject: (error: Error) => void;
+    }>
+  >([]);
+  const questionAnsweredAtRef = useRef(0);
+  const advanceQuestionQueue = useCallback(() => {
+    const next = questionQueueRef.current[0];
+    if (!next) {
+      setPendingQuestion(null);
+      return;
+    }
+    const current = next.questions[next.index];
+    setPendingQuestion(current ? { question: current.question, options: current.options, selected: 0 } : null);
+  }, []);
+  const answerQuestion = useCallback(
+    (option: string) => {
+      const current = questionQueueRef.current[0];
+      if (!current) return;
+      questionAnsweredAtRef.current = Date.now();
+      current.answers.push(option);
+      current.index += 1;
+      if (current.index >= current.questions.length) {
+        questionQueueRef.current.shift();
+        current.resolve(current.answers);
+      }
+      advanceQuestionQueue();
+    },
+    [advanceQuestionQueue],
+  );
+  const declineQuestion = useCallback(() => {
+    const current = questionQueueRef.current.shift();
+    if (!current) return;
+    questionAnsweredAtRef.current = Date.now();
+    current.resolve([]);
+    advanceQuestionQueue();
+  }, [advanceQuestionQueue]);
+  useEffect(() => {
+    agent.setQuestionResolver((questions, abortSignal) => {
+      return new Promise<string[]>((resolve, reject) => {
+        const item = { questions, answers: [] as string[], index: 0, resolve, reject };
+        questionQueueRef.current.push(item);
+        if (abortSignal) {
+          const onAbort = () => {
+            const at = questionQueueRef.current.indexOf(item);
+            if (at >= 0) questionQueueRef.current.splice(at, 1);
+            reject(new Error("aborted"));
+            advanceQuestionQueue();
+          };
+          if (abortSignal.aborted) {
+            onAbort();
+            return;
+          }
+          abortSignal.addEventListener("abort", onAbort, { once: true });
+        }
+        if (questionQueueRef.current.length === 1) {
+          advanceQuestionQueue();
+        }
+      });
+    });
+    return () => {
+      agent.setQuestionResolver(null);
+    };
+  }, [agent, advanceQuestionQueue]);
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([]);
   const [sessionTitle, setSessionTitle] = useState<string | null>(() => agent.getSessionTitle());
   const [sessionId, setSessionId] = useState<string | null>(() => agent.getSessionId());
@@ -1420,6 +1493,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     setActiveSubagent(null);
     setLiveTurnSourceLabel(null);
     contentAccRef.current = "";
+    for (const item of questionQueueRef.current) {
+      item.reject(new Error("turn ended"));
+    }
+    questionQueueRef.current = [];
+    setPendingQuestion(null);
   }, []);
 
   const finishTurnProcessing = useCallback(() => {
@@ -2192,7 +2270,13 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
   const interruptActiveRun = useCallback(
     (key?: KeyEvent) => {
-      if (permissionQueueRef.current.length > 0 || Date.now() - permissionAnsweredAtRef.current < 1000) return false;
+      if (
+        permissionQueueRef.current.length > 0 ||
+        Date.now() - permissionAnsweredAtRef.current < 1000 ||
+        questionQueueRef.current.length > 0 ||
+        Date.now() - questionAnsweredAtRef.current < 1000
+      )
+        return false;
       if (btwStateRef.current) {
         btwAbortRef.current?.abort();
         btwAbortRef.current = null;
@@ -2514,6 +2598,75 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         openScheduleModal();
         return true;
       }
+      if (c === "/fork") {
+        if (isProcessingRef.current) {
+          setMessages((prev) => [...prev, buildAssistantEntry("Cannot fork while a turn is running.")]);
+          return true;
+        }
+        const snapshot = agent.forkSession();
+        if (!snapshot) {
+          setMessages((prev) => [...prev, buildAssistantEntry("No session to fork.")]);
+          return true;
+        }
+        activeTurnRef.current = null;
+        clearLiveTurnUi();
+        setMessages(snapshot.entries);
+        setSessionTitle(snapshot.session.title);
+        setSessionId(snapshot.session.id);
+        queuedMessagesRef.current = [];
+        setQueuedMessages([]);
+        return true;
+      }
+      if (c.startsWith("/transfer ") || c === "/transfer") {
+        if (isProcessingRef.current) {
+          setMessages((prev) => [...prev, buildAssistantEntry("Cannot transfer while a turn is running.")]);
+          return true;
+        }
+        const target = cmd.trim().slice("/transfer".length).trim();
+        if (!target) {
+          setMessages((prev) => [
+            ...prev,
+            buildAssistantEntry("Usage: /transfer <path>\nExample: /transfer ~/projects/other"),
+          ]);
+          return true;
+        }
+        try {
+          agent.transferSession(target);
+          setMessages((prev) => [...prev, buildAssistantEntry(`Session moved to ${agent.getCwd()}.`)]);
+        } catch (error) {
+          setMessages((prev) => [
+            ...prev,
+            buildAssistantEntry(`Transfer failed: ${error instanceof Error ? error.message : String(error)}`),
+          ]);
+        }
+        return true;
+      }
+      if (c === "/budget" || c.startsWith("/budget ")) {
+        const arg = cmd.trim().slice("/budget".length).trim();
+        if (!arg) {
+          const current = agent.getSessionTokenBudget();
+          setMessages((prev) => [
+            ...prev,
+            buildAssistantEntry(
+              current > 0 ? `Session token budget: ${current} tokens.` : "Session token budget: unlimited.",
+            ),
+          ]);
+          return true;
+        }
+        const value = Number(arg);
+        if (!Number.isInteger(value) || value < 0) {
+          setMessages((prev) => [...prev, buildAssistantEntry("Usage: /budget <tokens>\nUse 0 for unlimited.")]);
+          return true;
+        }
+        agent.setSessionTokenBudget(value);
+        setMessages((prev) => [
+          ...prev,
+          buildAssistantEntry(
+            value > 0 ? `Session token budget set to ${value} tokens.` : "Session token budget removed (unlimited).",
+          ),
+        ]);
+        return true;
+      }
       if (c === "/quit" || c === "/exit" || c === "/q") {
         handleExit();
         return true;
@@ -2643,6 +2796,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     [
       agent,
       agentDefinitions,
+      clearLiveTurnUi,
       handleExit,
       openAgentsModal,
       openMcpModal,
@@ -2755,6 +2909,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     showRecapPicker ||
     !!pendingPaymentApproval ||
     !!pendingPermission ||
+    !!pendingQuestion ||
     showScheduleModal ||
     showAgentsModal ||
     showAgentsEditor ||
@@ -3337,6 +3492,23 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         return;
       }
+      if (pendingQuestion) {
+        if (isEscapeKey(key)) {
+          declineQuestion();
+          return;
+        }
+        if (key.name === "up" || key.name === "down") {
+          setPendingQuestion((p) =>
+            p ? { ...p, selected: wrapListIndex(p.selected, p.options.length, key.name === "down" ? 1 : -1) } : p,
+          );
+          return;
+        }
+        if (key.name === "return") {
+          answerQuestion(pendingQuestion.options[pendingQuestion.selected] ?? "");
+          return;
+        }
+        return;
+      }
       if (pendingPermission) {
         if (isEscapeKey(key)) {
           answerPermission("deny", false);
@@ -3652,7 +3824,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       showSandboxPicker,
       pendingPaymentApproval,
       pendingPermission,
+      pendingQuestion,
       answerPermission,
+      answerQuestion,
+      declineQuestion,
       processMessage,
       showSlashMenu,
       slashMenuIndex,
@@ -3819,6 +3994,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               {showPlanPanel && <PlanQuestionsPanel t={t} questions={planQuestions} state={pqs} />}
               {pendingPaymentApproval && <PaymentApprovalPanel t={t} payment={pendingPaymentApproval} />}
               {pendingPermission && <PermissionApprovalPanel t={t} permission={pendingPermission} />}
+              {pendingQuestion && <QuestionPanel t={t} question={pendingQuestion} />}
             </scrollbox>
             {btwState && <BtwOverlay state={btwState} theme={t} />}
             {/* Prompt */}
@@ -6082,6 +6258,81 @@ function PaymentApprovalPanel({
         <text>
           <span style={{ fg: t.text }}>{"esc"}</span>
           <span style={{ fg: t.textMuted }}>{" reject"}</span>
+        </text>
+      </box>
+    </box>
+  );
+}
+
+function QuestionPanel({
+  t,
+  question,
+}: {
+  t: Theme;
+  question: {
+    question: string;
+    options: string[];
+    selected: number;
+  };
+}) {
+  return (
+    <box
+      flexDirection="column"
+      border={["left"]}
+      customBorderChars={{
+        topLeft: "",
+        bottomLeft: "",
+        vertical: "┃",
+        topRight: "",
+        bottomRight: "",
+        horizontal: " ",
+        bottomT: "",
+        topT: "",
+        cross: "",
+        leftT: "",
+        rightT: "",
+      }}
+      borderColor="#61afef"
+      marginTop={1}
+      paddingLeft={2}
+      paddingRight={2}
+      paddingTop={1}
+      paddingBottom={1}
+      backgroundColor={t.backgroundPanel}
+    >
+      <text>
+        <span style={{ fg: t.planTitle ?? t.primary }}>
+          <b>{"Question"}</b>
+        </span>
+      </text>
+      <box marginTop={1}>
+        <text>
+          <span style={{ fg: t.text }}>{question.question}</span>
+        </text>
+      </box>
+      <box marginTop={1} flexDirection="column">
+        {question.options.map((label, i) => {
+          const isSel = i === question.selected;
+          return (
+            <text key={label}>
+              <span style={{ fg: isSel ? "#22c55e" : t.textMuted }}>{isSel ? "> " : "  "}</span>
+              <span style={{ fg: isSel ? t.text : t.textMuted }}>{isSel ? <b>{label}</b> : label}</span>
+            </text>
+          );
+        })}
+      </box>
+      <box flexDirection="row" gap={3} marginTop={1} flexShrink={0}>
+        <text>
+          <span style={{ fg: t.text }}>{"↑↓"}</span>
+          <span style={{ fg: t.textMuted }}>{" select"}</span>
+        </text>
+        <text>
+          <span style={{ fg: t.text }}>{"enter"}</span>
+          <span style={{ fg: t.textMuted }}>{" confirm"}</span>
+        </text>
+        <text>
+          <span style={{ fg: t.text }}>{"esc"}</span>
+          <span style={{ fg: t.textMuted }}>{" decline"}</span>
         </text>
       </box>
     </box>

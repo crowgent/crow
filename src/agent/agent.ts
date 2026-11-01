@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import type { ModelMessage } from "ai";
 import {
   type CrowProvider,
@@ -7,6 +9,7 @@ import {
 } from "../crow/client";
 import { normalizeModelId } from "../crow/models";
 import { type PermissionResolver, type PermissionRule, PermissionStore } from "../crow/permissions";
+import type { QuestionItem, QuestionResolver } from "../crow/tools";
 import { executeEventHooks } from "../hooks/index";
 import type {
   NotificationHookInput,
@@ -25,6 +28,7 @@ import {
   deletePersistedMessage,
   deleteTurnDraft as deleteStoredTurnDraft,
   enqueueInbox,
+  forkSession as forkStoredSession,
   getSessionTotalTokens,
   listInbox,
   loadTranscript,
@@ -56,8 +60,10 @@ import {
   getCurrentModel,
   getModeSpecificModel,
   loadRecapsEnabled,
+  loadUserSettings,
   type SandboxMode,
   type SandboxSettings,
+  saveUserSettings,
 } from "../utils/settings";
 import { runSideQuestion, type SideQuestionResult } from "../utils/side-question";
 import { buildVerifyDetectPrompt, normalizeVerifyRecipe } from "../verify/entrypoint";
@@ -161,6 +167,8 @@ export class Agent {
   private recapsEnabled = true;
   private permissionStore = new PermissionStore();
   private permissionResolver: PermissionResolver | null = null;
+  private questionResolver: QuestionResolver | null = null;
+  private sessionTokenBudget = 0;
 
   constructor(
     apiKey: string | undefined,
@@ -193,6 +201,7 @@ export class Agent {
     this.maxTokens = Number.isFinite(envMax) && envMax > 0 ? envMax : 16_384;
     this.batchApi = options.batchApi ?? false;
     this.recapsEnabled = loadRecapsEnabled();
+    this.sessionTokenBudget = loadUserSettings().sessionTokenBudget ?? 0;
 
     if (options.persistSession !== false) {
       this.sessionStore = new SessionStore(this.bash.getCwd());
@@ -398,6 +407,48 @@ export class Agent {
 
   setPermissionResolver(resolver: PermissionResolver | null): void {
     this.permissionResolver = resolver;
+  }
+
+  setQuestionResolver(resolver: QuestionResolver | null): void {
+    this.questionResolver = resolver;
+  }
+
+  async askQuestion(questions: QuestionItem[], abortSignal?: AbortSignal): Promise<string[]> {
+    if (!this.questionResolver) return [];
+    return this.questionResolver(questions, abortSignal);
+  }
+
+  getSessionTokenBudget(): number {
+    return this.sessionTokenBudget;
+  }
+
+  setSessionTokenBudget(budget: number): void {
+    this.sessionTokenBudget = budget;
+    saveUserSettings({ sessionTokenBudget: budget });
+  }
+
+  forkSession(): SessionSnapshot | null {
+    if (!this.sessionStore || !this.session) return null;
+    const newId = forkStoredSession(this.session.id);
+    if (!newId) return null;
+    this.session = this.sessionStore.getRequiredSession(newId);
+    const transcript = loadTranscriptState(newId);
+    this.messages = transcript.messages;
+    this.messageSeqs = transcript.seqs;
+    this.sessionStartHookFired = false;
+    return this.getSessionSnapshot();
+  }
+
+  transferSession(newCwd: string): SessionSnapshot | null {
+    if (!this.sessionStore || !this.session) return null;
+    const resolved = path.resolve(newCwd);
+    fs.mkdirSync(resolved, { recursive: true });
+    this.sessionStore.moveSession(this.session.id, resolved);
+    this.sessionStore = new SessionStore(resolved);
+    this.workspace = this.sessionStore.getWorkspace();
+    this.session = this.sessionStore.getRequiredSession(this.session.id);
+    this.bash.setCwd(resolved);
+    return this.getSessionSnapshot();
   }
 
   addPermissionRule(rule: PermissionRule): void {
@@ -832,6 +883,10 @@ export class Agent {
       updateTurnDraft: (text) => agent.updateTurnDraft(text),
       deleteTurnDraft: () => agent.deleteTurnDraft(),
       abandonPersistedTurn: (userSeq) => agent.abandonPersistedTurn(userSeq),
+      askQuestion: (questions, abortSignal) => agent.askQuestion(questions, abortSignal),
+      get sessionTokenBudget() {
+        return agent.sessionTokenBudget;
+      },
       fireHook: (input, signal) => this.fireHook(input, signal),
       recordUsage: (usage, source, model) => this.recordUsage(usage, source, model),
       emitSubagentStatus: (status) => this.emitSubagentStatus(status),

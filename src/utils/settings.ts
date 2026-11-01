@@ -145,6 +145,7 @@ export interface UserSettings {
   providerModels?: Record<string, string>;
   customProviders?: CustomProvider[];
   recapsEnabled?: boolean;
+  sessionTokenBudget?: number;
   sandboxMode?: SandboxMode;
   sandbox?: SandboxSettings;
   lsp?: LspSettings;

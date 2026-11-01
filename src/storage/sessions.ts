@@ -154,6 +154,18 @@ export class SessionStore {
       .run(mode, now, id);
   }
 
+  moveSession(id: string, newCwd: string): void {
+    const workspace = ensureWorkspace(newCwd);
+    const now = new Date().toISOString();
+    getDatabase()
+      .prepare(`
+      UPDATE sessions
+      SET workspace_id = ?, cwd_last = ?, updated_at = ?
+      WHERE id = ?
+    `)
+      .run(workspace.id, newCwd, now, id);
+  }
+
   touchSession(id: string, cwd: string): void {
     getDatabase()
       .prepare(`
