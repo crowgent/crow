@@ -112,7 +112,7 @@ import {
 
 import { humanizeApiError, isAuthenticationError, isContextLimitError } from "./errors";
 import { applyModelConstraints, buildSystemPrompt } from "./prompts";
-import { containsEncryptedReasoning, sanitizeModelMessages } from "./reasoning";
+import { sanitizeModelMessages } from "./reasoning";
 import {
   formatSubagentActivity,
   runTask as runSubagentTask,
@@ -120,6 +120,7 @@ import {
   type SubagentContext,
   truncate,
 } from "./subagents";
+import { ThoughtTracker } from "./thought";
 import { buildVisionUserMessages } from "./vision-input";
 
 const MAX_TOOL_ROUNDS = 400;
@@ -1032,10 +1033,9 @@ export class Agent {
     this.messageSeqs.push(null);
 
     this.requireProvider();
-    let capturedReasoning = "";
-    let capturedReasoningEmitted = 0;
+    const thoughtTracker = new ThoughtTracker();
     const reasoningCapture = createReasoningCapture((text) => {
-      capturedReasoning += text;
+      thoughtTracker.capture(text);
     });
     const provider = createProvider(this.apiKey ?? "", this.baseURL ?? undefined, reasoningCapture.fetch);
     const subagents = loadValidSubAgents();
@@ -1054,8 +1054,6 @@ export class Agent {
     const modelInfo = runtime.modelInfo;
     this.planContext = null;
     let attemptedOverflowRecovery = false;
-    let thinkStartMs = 0;
-    let thinkDoneMs: number | null = null;
 
     if (this.batchApi) {
       try {
@@ -1080,8 +1078,6 @@ export class Agent {
     try {
       while (true) {
         let assistantText = "";
-        let reasoningPreview = "";
-        let encryptedReasoningHidden = false;
         let streamOk = false;
         let closeMcp: (() => Promise<void>) | undefined;
         let stepNumber = -1;
@@ -1126,19 +1122,7 @@ export class Agent {
             }
           }
 
-          const emitReasoning = function* (text: string): Generator<StreamChunk> {
-            reasoningPreview = `${reasoningPreview}${text}`.slice(-256);
-            if (containsEncryptedReasoning(reasoningPreview)) {
-              if (!encryptedReasoningHidden) {
-                encryptedReasoningHidden = true;
-                yield { type: "reasoning", content: "[Encrypted reasoning hidden]" };
-              }
-              return;
-            }
-            yield { type: "reasoning", content: text };
-          };
-
-          if (thinkStartMs === 0) thinkStartMs = Date.now();
+          thoughtTracker.start();
           const result = streamText({
             model: runtime.model,
             system,
@@ -1178,21 +1162,8 @@ export class Agent {
               break;
             }
 
-            if (
-              thinkDoneMs == null &&
-              (part.type === "text-delta" ||
-                part.type === "tool-call" ||
-                part.type === "tool-result" ||
-                part.type === "error")
-            ) {
-              thinkDoneMs = Date.now();
-            }
-
-            if (capturedReasoningEmitted < capturedReasoning.length) {
-              const fresh = capturedReasoning.slice(capturedReasoningEmitted);
-              capturedReasoningEmitted = capturedReasoning.length;
-              yield* emitReasoning(fresh);
-            }
+            thoughtTracker.noteStreamPart(part.type);
+            yield* thoughtTracker.emitFresh();
 
             switch (part.type) {
               case "text-delta":
@@ -1201,7 +1172,7 @@ export class Agent {
                 break;
 
               case "reasoning-delta":
-                yield* emitReasoning(part.text);
+                yield* thoughtTracker.emitText(part.text);
                 break;
 
               case "tool-call": {
@@ -1283,9 +1254,7 @@ export class Agent {
           }
 
           await reasoningCapture.settled();
-          const thinkDurationMs = thinkStartMs > 0 ? (thinkDoneMs ?? Date.now()) - thinkStartMs : undefined;
-          const thought =
-            thinkDurationMs == null ? undefined : { durationMs: thinkDurationMs, text: capturedReasoning.trim() };
+          const thought = thoughtTracker.finish();
           try {
             const response = await result.response;
             if (!signal.aborted) {
