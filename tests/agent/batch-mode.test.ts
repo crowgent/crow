@@ -1,35 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-async function importAgentModuleWithBatchMocks() {
+async function importBatchModuleWithMocks() {
   vi.resetModules();
-  vi.doMock("../../src/storage/index", () => ({
-    appendCompaction: vi.fn(),
-    appendMessages: vi.fn(() => []),
-    appendSystemMessage: vi.fn(() => 0),
-    buildChatEntries: vi.fn(() => []),
-    getNextMessageSequence: vi.fn(() => 0),
-    getSessionTotalTokens: vi.fn(() => 0),
-    loadTranscript: vi.fn(() => []),
-    loadTranscriptState: vi.fn(() => ({ messages: [], seqs: [] })),
-    recordUsageEvent: vi.fn(),
-    SessionStore: class {
-      getWorkspace() {
-        return null;
-      }
-      openSession() {
-        return null;
-      }
-      createSession() {
-        return null;
-      }
-      setModel() {}
-      getRequiredSession() {
-        return null;
-      }
-      setMode() {}
-      touchSession() {}
-    },
-  }));
 
   const createBatch = vi.fn(async () => ({
     batch_id: "batch-1",
@@ -59,7 +31,7 @@ async function importAgentModuleWithBatchMocks() {
     };
   });
 
-  const mod = await import("../../src/agent/agent");
+  const mod = await import("../../src/agent/batch");
   return {
     ...mod,
     mocks: {
@@ -74,52 +46,43 @@ async function importAgentModuleWithBatchMocks() {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetModules();
-  vi.doUnmock("../../src/storage/index");
   vi.doUnmock("../../src/crow/batch");
 });
 
 describe("Agent batch mode", () => {
   it("throws when a child batch response has no choices", async () => {
-    const { Agent, mocks } = await importAgentModuleWithBatchMocks();
-    const agent = new Agent("test-key", "https://api.x.ai/v1", undefined, undefined, {
-      persistSession: false,
-    });
-
-    const runTaskRequestBatch = (
-      agent as unknown as {
-        runTaskRequestBatch: (args: {
-          request: { agent: string; description: string; prompt: string };
-          childMessages: Array<{ role: "user"; content: string }>;
-          childSystem: string;
-          childRuntime: unknown;
-          childTools: Record<string, never>;
-          maxSteps: number;
-          initialDetail: string;
-        }) => Promise<unknown>;
-      }
-    ).runTaskRequestBatch.bind(agent);
+    const { runTaskRequestBatch, mocks } = await importBatchModuleWithMocks();
 
     await expect(
-      runTaskRequestBatch({
-        request: {
-          agent: "general",
-          description: "Child task",
-          prompt: "Do the thing",
+      runTaskRequestBatch(
+        {
+          apiKey: "test-key",
+          baseURL: "https://api.x.ai/v1",
+          maxTokens: 16384,
+          recordUsage: () => {},
+          formatActivity: () => "",
         },
-        childMessages: [{ role: "user", content: "Do the thing" }],
-        childSystem: "system",
-        childRuntime: {
-          modelId: "grok-4.3",
-          modelInfo: {
-            supportsClientTools: false,
-            supportsMaxOutputTokens: true,
+        {
+          request: {
+            agent: "general",
+            description: "Child task",
+            prompt: "Do the thing",
           },
-          providerOptions: undefined,
+          childMessages: [{ role: "user", content: "Do the thing" }],
+          childSystem: "system",
+          childRuntime: {
+            modelId: "grok-4.3",
+            modelInfo: {
+              supportsClientTools: false,
+              supportsMaxOutputTokens: true,
+            },
+            providerOptions: undefined,
+          } as never,
+          childTools: {},
+          maxSteps: 1,
+          initialDetail: "Starting child task",
         },
-        childTools: {},
-        maxSteps: 1,
-        initialDetail: "Starting child task",
-      }),
+      ),
     ).rejects.toThrow("Batch response did not contain any choices.");
 
     expect(mocks.createBatch).toHaveBeenCalled();
