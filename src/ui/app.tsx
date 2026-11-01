@@ -1799,11 +1799,17 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             setProviderIndex(0);
             setProviderStep("customModelList");
           } else {
+            setProviderError(
+              "Could not load models from this base URL. Check the base URL and API key, then enter a model id manually.",
+            );
             setProviderStep("customModel");
           }
         })
         .catch(() => {
           setProviderLoading(false);
+          setProviderError(
+            "Could not load models from this base URL. Check the base URL and API key, then enter a model id manually.",
+          );
           setProviderStep("customModel");
         });
       return;
