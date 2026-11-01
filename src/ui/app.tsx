@@ -52,19 +52,15 @@ import {
   isReservedSubagentName,
   loadCustomProviders,
   loadMcpServers,
-  loadPaymentSettings,
   loadUserSettings,
   loadValidSubAgents,
   type McpRemoteTransport,
   type McpServerConfig,
-  type PaymentChain,
-  type PaymentSettings,
   type SandboxMode,
   type SandboxSettings,
   saveApprovedTelegramUserId,
   saveCustomProviders,
   saveMcpServers,
-  savePaymentSettings,
   saveProjectSettings,
   saveProviderApiKey,
   saveRecapsEnabled,
@@ -253,7 +249,6 @@ const BUILTIN_TYPED_SLASH_COMMANDS = new Set([
   "/verify",
   "/commit-push",
   "/commit-pr",
-  "/wallet",
   "/btw",
 ]);
 
@@ -362,66 +357,6 @@ function formatRecapsEnabled(enabled: boolean): (typeof RECAP_OPTIONS)[number] {
   return enabled ? "On" : "Off";
 }
 
-interface WalletDisplayInfo {
-  address: string | null;
-  ethBalance: string | null;
-  usdcBalance: string | null;
-}
-
-interface WalletRow {
-  key: string;
-  label: string;
-  type: "toggle" | "readonly";
-  getDisplay: (settings: Required<PaymentSettings>, info: WalletDisplayInfo) => string;
-  getOptions?: () => string[];
-  apply?: (settings: Required<PaymentSettings>, value: string) => Partial<PaymentSettings>;
-}
-
-const WALLET_ROWS: WalletRow[] = [
-  {
-    key: "enabled",
-    label: "Payments",
-    type: "toggle",
-    getDisplay: (s) => (s.enabled ? "enabled" : "disabled"),
-    getOptions: () => ["enabled", "disabled"],
-    apply: (_s, v) => ({ enabled: v === "enabled" }),
-  },
-  {
-    key: "chain",
-    label: "Chain",
-    type: "toggle",
-    getDisplay: (s) => s.chain,
-    getOptions: () => ["base-sepolia", "base"] as PaymentChain[],
-    apply: (_s, v) => ({ chain: v as PaymentChain }),
-  },
-  {
-    key: "autoApprove",
-    label: "Auto-approve",
-    type: "toggle",
-    getDisplay: (s) => (s.approval.autoApprove ? "on" : "off"),
-    getOptions: () => ["off", "on"],
-    apply: (s, v) => ({ approval: { ...s.approval, autoApprove: v === "on" } }),
-  },
-  {
-    key: "address",
-    label: "Address",
-    type: "readonly",
-    getDisplay: (_s, info) => info.address ?? "No wallet",
-  },
-  {
-    key: "eth",
-    label: "ETH",
-    type: "readonly",
-    getDisplay: (_s, info) => info.ethBalance ?? "...",
-  },
-  {
-    key: "usdc",
-    label: "USDC",
-    type: "readonly",
-    getDisplay: (_s, info) => info.usdcBalance ?? "...",
-  },
-];
-
 function parseCustomSubagentSlashCommand(
   cmd: string,
   subagents: CustomSubagentConfig[],
@@ -521,14 +456,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [sandboxSettingsEditBuffer, setSandboxSettingsEditBuffer] = useState("");
   const [showRecapPicker, setShowRecapPicker] = useState(false);
   const [recapsEnabled, setRecapsEnabledState] = useState(() => agent.getRecapsEnabled());
-  const [showWalletPicker, setShowWalletPicker] = useState(false);
-  const [walletSettings, setWalletSettings] = useState<Required<PaymentSettings>>(() => loadPaymentSettings());
-  const [walletFocusIndex, setWalletFocusIndex] = useState(0);
-  const [walletDisplayInfo, setWalletDisplayInfo] = useState<WalletDisplayInfo>({
-    address: null,
-    ethBalance: null,
-    usdcBalance: null,
-  });
   const [pendingPaymentApproval, setPendingPaymentApproval] = useState<{
     url: string;
     description: string;
@@ -850,35 +777,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
   const openRecapPicker = useCallback(() => {
     setShowRecapPicker(true);
-  }, []);
-
-  const applyWalletSettings = useCallback((next: Required<PaymentSettings>) => {
-    setWalletSettings(next);
-    savePaymentSettings(next);
-  }, []);
-
-  const openWalletPicker = useCallback(() => {
-    setWalletFocusIndex(0);
-    setWalletSettings(loadPaymentSettings());
-    setShowWalletPicker(true);
-    setWalletDisplayInfo({ address: null, ethBalance: null, usdcBalance: null });
-    import("../wallet/manager")
-      .then(async ({ WalletManager }) => {
-        if (!WalletManager.exists()) {
-          setWalletDisplayInfo({ address: null, ethBalance: null, usdcBalance: null });
-          return;
-        }
-        const wm = new WalletManager();
-        const data = wm.getWalletData();
-        setWalletDisplayInfo({ address: data.address, ethBalance: null, usdcBalance: null });
-        const balance = await wm.getBalance();
-        setWalletDisplayInfo({
-          address: balance.address,
-          ethBalance: balance.nativeBalance,
-          usdcBalance: balance.usdcBalance,
-        });
-      })
-      .catch(() => {});
   }, []);
 
   const setReasoningEfforts = useCallback((next: Record<string, ReasoningEffort>) => {
@@ -2366,10 +2264,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         openRecapPicker();
         return true;
       }
-      if (c === "/wallet") {
-        openWalletPicker();
-        return true;
-      }
       if (c === "/remote-control") {
         setConnectModalIndex(0);
         setShowConnectModal(true);
@@ -2465,7 +2359,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       openMcpModal,
       openRecapPicker,
       openSandboxPicker,
-      openWalletPicker,
       openProviderConnect,
       openProviderModels,
       openScheduleModal,
@@ -2494,9 +2387,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           break;
         case "recaps":
           openRecapPicker();
-          break;
-        case "wallet":
-          openWalletPicker();
           break;
         case "remote-control":
           setConnectModalIndex(0);
@@ -2569,7 +2459,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       openProviderModels,
       openRecapPicker,
       openSandboxPicker,
-      openWalletPicker,
       openScheduleModal,
       processMessage,
       resetToNewSession,
@@ -2585,7 +2474,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     showMcpModal ||
     showSandboxPicker ||
     showRecapPicker ||
-    showWalletPicker ||
     !!pendingPaymentApproval ||
     showScheduleModal ||
     showAgentsModal ||
@@ -3215,49 +3103,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         return;
       }
-      if (showWalletPicker) {
-        if (isEscapeKey(key)) {
-          setShowWalletPicker(false);
-          return;
-        }
-        if (key.name === "up") {
-          setWalletFocusIndex((i) => Math.max(0, i - 1));
-          return;
-        }
-        if (key.name === "down") {
-          setWalletFocusIndex((i) => Math.min(WALLET_ROWS.length - 1, i + 1));
-          return;
-        }
-
-        const focusedWalletRow = WALLET_ROWS[walletFocusIndex];
-        if (!focusedWalletRow || focusedWalletRow.type === "readonly") return;
-
-        if (key.name === "left" || key.name === "right") {
-          const options = focusedWalletRow.getOptions!();
-          const current = focusedWalletRow.getDisplay(walletSettings, walletDisplayInfo);
-          const idx = options.indexOf(current);
-          const next =
-            key.name === "right" ? options[Math.min(options.length - 1, idx + 1)] : options[Math.max(0, idx - 1)];
-          if (next && next !== current && focusedWalletRow.apply) {
-            const patch = focusedWalletRow.apply(walletSettings, next);
-            applyWalletSettings({ ...walletSettings, ...patch });
-          }
-          return;
-        }
-
-        if (key.name === "return") {
-          const options = focusedWalletRow.getOptions!();
-          const current = focusedWalletRow.getDisplay(walletSettings, walletDisplayInfo);
-          const idx = options.indexOf(current);
-          const next = options[(idx + 1) % options.length];
-          if (next && focusedWalletRow.apply) {
-            const patch = focusedWalletRow.apply(walletSettings, next);
-            applyWalletSettings({ ...walletSettings, ...patch });
-          }
-          return;
-        }
-        return;
-      }
       if (showSandboxPicker) {
         const visibleRows = getSandboxVisibleRows(sandboxMode);
 
@@ -3503,11 +3348,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       showSandboxPicker,
       pendingPaymentApproval,
       processMessage,
-      showWalletPicker,
-      walletSettings,
-      walletFocusIndex,
-      walletDisplayInfo,
-      applyWalletSettings,
       showSlashMenu,
       slashMenuIndex,
       submitProviderStep,
@@ -3672,7 +3512,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 isProcessing={isProcessing}
                 showModelPicker={showModelPicker}
                 showSandboxPicker={showSandboxPicker}
-                showWalletPicker={showWalletPicker}
                 showSlashMenu={showSlashMenu}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
@@ -3712,7 +3551,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 isProcessing={isProcessing}
                 showModelPicker={showModelPicker}
                 showSandboxPicker={showSandboxPicker}
-                showWalletPicker={showWalletPicker}
                 showSlashMenu={showSlashMenu}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
@@ -3878,16 +3716,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           reasoningEffortByModel={reasoningEffortByModel}
         />
       )}
-      {showWalletPicker && (
-        <WalletPickerModal
-          t={t}
-          settings={walletSettings}
-          walletInfo={walletDisplayInfo}
-          focusIndex={walletFocusIndex}
-          width={width}
-          height={height}
-        />
-      )}
       {showRecapPicker && <RecapPickerModal t={t} enabled={recapsEnabled} width={width} height={height} />}
       {showSandboxPicker && (
         <SandboxPickerModal
@@ -4009,7 +3837,6 @@ function PromptBox({
   isProcessing,
   showModelPicker,
   showSandboxPicker,
-  showWalletPicker,
   showSlashMenu,
   showPlanQuestions,
   showProviderModal,
@@ -4031,7 +3858,6 @@ function PromptBox({
   isProcessing: boolean;
   showModelPicker: boolean;
   showSandboxPicker: boolean;
-  showWalletPicker: boolean;
   showSlashMenu: boolean;
   showPlanQuestions: boolean;
   showProviderModal: boolean;
@@ -4104,7 +3930,6 @@ function PromptBox({
               focused={
                 !showModelPicker &&
                 !showSandboxPicker &&
-                !showWalletPicker &&
                 !showSlashMenu &&
                 !showPlanQuestions &&
                 !showProviderModal &&
@@ -4263,6 +4088,10 @@ function ProviderConnectModal({
   loading: boolean;
 }) {
   const overlayBg = "#000000cc" as string;
+  const listRef = useRef<ScrollBoxRenderable>(null);
+  useEffect(() => {
+    listRef.current?.scrollChildIntoView(`provider-${providerIndex}`);
+  }, [providerIndex]);
   const panelWidth = Math.min(68, width - 6);
   const isList = step === "list" || step === "customModelList";
   const listItems =
@@ -4349,12 +4178,13 @@ function ProviderConnectModal({
           <text fg={t.text}>{loading ? "Fetching models..." : prompt}</text>
         </box>
         {isList ? (
-          <scrollbox flexGrow={1} minHeight={0}>
+          <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
             {listItems.map((item, idx) => {
               const selected = idx === providerIndex;
               return (
                 <box
                   key={item}
+                  id={`provider-${idx}`}
                   backgroundColor={selected ? t.selectedBg : undefined}
                   paddingLeft={2}
                   paddingRight={2}
@@ -5882,86 +5712,6 @@ function PaymentApprovalPanel({
           <span style={{ fg: t.text }}>{"esc"}</span>
           <span style={{ fg: t.textMuted }}>{" reject"}</span>
         </text>
-      </box>
-    </box>
-  );
-}
-
-function WalletPickerModal({
-  t,
-  settings,
-  walletInfo,
-  focusIndex,
-  width,
-  height,
-}: {
-  t: Theme;
-  settings: Required<PaymentSettings>;
-  walletInfo: WalletDisplayInfo;
-  focusIndex: number;
-  width: number;
-  height: number;
-}) {
-  const panelHeight = Math.min(WALLET_ROWS.length + 6, Math.floor(height * 0.6));
-  const top = bottomAlignedModalTop(height, panelHeight);
-  const overlayBg = "#000000cc" as string;
-
-  return (
-    <box
-      position="absolute"
-      left={0}
-      top={0}
-      width={width}
-      height={height}
-      alignItems="center"
-      paddingTop={top}
-      backgroundColor={overlayBg}
-    >
-      <box
-        width={Math.min(64, width - 6)}
-        height={panelHeight}
-        backgroundColor={t.backgroundPanel}
-        paddingTop={1}
-        paddingBottom={1}
-        flexDirection="column"
-      >
-        <box flexShrink={0} flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2}>
-          <text fg={t.primary}>
-            <b>{"Wallet & Payments"}</b>
-          </text>
-          <text fg={t.textMuted}>{"esc"}</text>
-        </box>
-        <scrollbox flexGrow={1} minHeight={0}>
-          {WALLET_ROWS.map((row, idx) => {
-            const focused = idx === focusIndex;
-            const display = row.getDisplay(settings, walletInfo);
-            return (
-              <box
-                key={row.key}
-                backgroundColor={focused ? t.selectedBg : undefined}
-                paddingLeft={2}
-                paddingRight={2}
-                width="100%"
-              >
-                <box width="100%" flexDirection="row" justifyContent="space-between">
-                  <text fg={focused ? t.selected : t.text}>{row.label}</text>
-                  {row.type === "toggle" ? (
-                    <text fg={focused ? t.primary : t.textMuted}>
-                      {"< "}
-                      {display}
-                      {" >"}
-                    </text>
-                  ) : (
-                    <text fg={focused ? t.primary : t.textMuted}>{display}</text>
-                  )}
-                </box>
-              </box>
-            );
-          })}
-        </scrollbox>
-        <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
-          <text fg={t.textMuted}>{"arrows navigate  left/right toggle  esc close"}</text>
-        </box>
       </box>
     </box>
   );

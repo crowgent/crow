@@ -13,7 +13,6 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "schedule", label: "schedule", description: "View scheduled runs" },
   { id: "mcp", label: "mcp", description: "Manage MCP servers" },
   { id: "sandbox", label: "sandbox", description: "Select shell sandbox mode" },
-  { id: "wallet", label: "wallet", description: "Wallet and payment settings" },
   { id: "connect", label: "connect", description: "Choose a provider and enter its API key", aliases: ["login"] },
   {
     id: "models",

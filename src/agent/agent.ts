@@ -179,10 +179,6 @@ TOOLS:
 - process_logs: View recent output from a background process by ID.
 - process_stop: Stop a background process by ID.
 - process_list: List all background processes with status and uptime.
-- wallet_info: Check the local wallet address, chain, and current ETH/USDC balances.
-- wallet_history: Show recent x402 payment history from the audit log.
-- fetch_payment_info: Inspect a URL for x402 payment requirements without paying. Returns payment options and a brin security score. Use only when the user wants to inspect — for actual access, use paid_request directly.
-- paid_request: Access an x402-protected URL using the local wallet. Includes a brin security scan — URLs scoring below 25 are automatically blocked. The user will be prompted to approve the payment before it executes. Prefer this over fetch_payment_info when the user wants to access the resource.
 - task: Delegate a focused foreground task to a sub-agent. Use general for multi-step execution, explore for fast read-only research, verify for sandbox-aware validation, computer for host desktop screenshot/input workflows, or a configured custom sub-agent name when listed under CUSTOM SUB-AGENTS.
 - delegate: Launch a read-only background agent for longer research while you continue working.
 - delegation_read: Retrieve a completed background delegation result by ID.
@@ -2039,60 +2035,15 @@ export class Agent {
                   id: toolCallId,
                   type: "function" as const,
                   function: {
-                    name: approvalPart.toolCall?.toolName ?? "paid_request",
+                    name: approvalPart.toolCall?.toolName ?? "",
                     arguments: JSON.stringify(approvalPart.toolCall?.input ?? {}),
                   },
                 };
-
-                let paymentPrecheck: import("../types/index").PaymentPrecheck | undefined;
-                if (approvalPart.toolCall?.toolName === "paid_request") {
-                  try {
-                    const input = approvalPart.toolCall.input as { url?: string; method?: string } | null;
-                    const url = input?.url;
-                    if (url) {
-                      const { scanUrl } = await import("../payments/brin");
-                      const brin = await scanUrl(url);
-                      if (brin) {
-                        const securityRaw = `${brin.score}/100 (${brin.verdict}, ${brin.confidence} confidence)`;
-                        paymentPrecheck = {
-                          security: securityRaw,
-                          securityLabel: securityRaw,
-                          securityUrl: brin.url ?? "",
-                        };
-                      }
-
-                      const probeRes = await fetch(url, {
-                        method: input?.method ?? "GET",
-                        signal: AbortSignal.timeout(3_000),
-                      });
-                      if (probeRes.status === 402) {
-                        const header = probeRes.headers.get("payment-required");
-                        if (header) {
-                          const decoded = JSON.parse(Buffer.from(header, "base64").toString("utf-8"));
-                          const opts = decoded.accepts ?? [];
-                          if (opts.length > 0) {
-                            const opt = opts[0];
-                            paymentPrecheck = {
-                              ...paymentPrecheck,
-                              amount: opt.amount ?? opt.maxAmountRequired ?? opt.price ?? "",
-                              network: opt.network ?? "",
-                              asset: opt.asset ?? "",
-                              description: decoded.resource?.description ?? decoded.description ?? "",
-                            };
-                          }
-                        }
-                      }
-                    }
-                  } catch {
-                    // pre-check is best-effort
-                  }
-                }
 
                 yield {
                   type: "tool_approval_request",
                   approvalId: approvalPart.approvalId,
                   toolCall: tcForChunk,
-                  paymentPrecheck,
                 };
                 break;
               }
