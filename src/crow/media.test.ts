@@ -19,7 +19,7 @@ describe("media tools", () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "grok-media-"));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "crow-media-"));
     generateImageMock.mockReset();
     generateVideoMock.mockReset();
     globalThis.fetch = originalFetch;
@@ -30,7 +30,7 @@ describe("media tools", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it("generates edited images from a local source path and saves them under .grok/generated-media", async () => {
+  it("generates edited images from a local source path and saves them under .crow/generated-media", async () => {
     const sourcePath = path.join(tempDir, "input.png");
     fs.writeFileSync(sourcePath, Buffer.from([1, 2, 3, 4]));
     generateImageMock.mockResolvedValue({
@@ -72,7 +72,7 @@ describe("media tools", () => {
     expect(media).toHaveLength(1);
     expect(media[0]?.sourcePath).toBe(sourcePath);
     expect(media[0]?.url).toBe("https://example.com/generated.png");
-    expect(media[0]?.path).toContain(path.join(".grok", "generated-media"));
+    expect(media[0]?.path).toContain(path.join(".crow", "generated-media"));
     expect(fs.existsSync(media[0]?.path ?? "")).toBe(true);
   });
 

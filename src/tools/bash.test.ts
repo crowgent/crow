@@ -114,7 +114,7 @@ describe("shouldRunOnHostInSandboxMode", () => {
   it("allows compound commands with only safe prefixes like mkdir and sleep", () => {
     expect(
       shouldRunOnHostInSandboxMode(
-        "mkdir -p .grok/verify-artifacts && agent-browser --session verify open http://127.0.0.1:3000",
+        "mkdir -p .crow/verify-artifacts && agent-browser --session verify open http://127.0.0.1:3000",
         { hostBrowserCommandsOnHost: true },
       ),
     ).toBe(true);
@@ -123,7 +123,7 @@ describe("shouldRunOnHostInSandboxMode", () => {
     ).toBe(true);
     expect(
       shouldRunOnHostInSandboxMode(
-        "mkdir -p .grok/verify-artifacts && agent-browser open http://127.0.0.1:3000 && agent-browser screenshot",
+        "mkdir -p .crow/verify-artifacts && agent-browser open http://127.0.0.1:3000 && agent-browser screenshot",
         { hostBrowserCommandsOnHost: true },
       ),
     ).toBe(true);
@@ -180,19 +180,19 @@ describe("wrapHostBrowserCommand", () => {
     const result = wrapHostBrowserCommand(
       "agent-browser open http://127.0.0.1:3000 && agent-browser screenshot out.png",
     );
-    expect(result).toContain("__grok_ab()");
+    expect(result).toContain("__crow_ab()");
     expect(result).toContain("command agent-browser");
     expect(result).toContain("bunx agent-browser");
     expect(result).toContain("npx -y agent-browser");
-    expect(result).toContain("__grok_ab open http://127.0.0.1:3000");
-    expect(result).toContain("__grok_ab screenshot out.png");
+    expect(result).toContain("__crow_ab open http://127.0.0.1:3000");
+    expect(result).toContain("__crow_ab screenshot out.png");
   });
 
   it("handles session flags and screenshot paths correctly", () => {
     const result = wrapHostBrowserCommand(
-      "agent-browser --session verify screenshot .grok/verify-artifacts/verify-smoke-home.png",
+      "agent-browser --session verify screenshot .crow/verify-artifacts/verify-smoke-home.png",
     );
-    expect(result).toContain("__grok_ab --session verify screenshot .grok/verify-artifacts/verify-smoke-home.png");
+    expect(result).toContain("__crow_ab --session verify screenshot .crow/verify-artifacts/verify-smoke-home.png");
   });
 });
 
@@ -265,7 +265,7 @@ describe("getSandboxMutationBlockReason", () => {
 
 describe("BashTool sandbox state", () => {
   it("tracks cwd changes independently of sandbox mode", () => {
-    const root = makeTempDir("grok-bash-test-");
+    const root = makeTempDir("crow-bash-test-");
     const nested = path.join(root, "nested");
     fs.mkdirSync(nested);
     const bash = new BashTool(root, { sandboxMode: "shuru" });

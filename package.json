@@ -1,5 +1,5 @@
 {
-  "name": "grok-dev",
+  "name": "crow",
   "version": "1.1.7",
   "description": "An open-source AI coding agent powered by Grok, built with Bun and OpenTUI.",
   "type": "module",
@@ -11,12 +11,12 @@
     }
   },
   "bin": {
-    "grok": "dist/index.js"
+    "crow": "dist/index.js"
   },
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "tsc",
-    "build:binary": "bun build --compile --outfile dist/grok-standalone ./src/index.ts",
+    "build:binary": "bun build --compile --outfile dist/crow-standalone ./src/index.ts",
     "start": "bun run dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "bunx vitest run",
@@ -34,7 +34,7 @@
   "keywords": [
     "cli",
     "agent",
-    "grok",
+    "crow",
     "ai",
     "coding",
     "terminal",

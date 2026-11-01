@@ -48,8 +48,8 @@ async function importAgentModuleWithBatchMocks() {
     usage: {},
   }));
 
-  vi.doMock("../grok/batch", async () => {
-    const actual = await vi.importActual<typeof import("../grok/batch")>("../grok/batch");
+  vi.doMock("../crow/batch", async () => {
+    const actual = await vi.importActual<typeof import("../crow/batch")>("../crow/batch");
     return {
       ...actual,
       createBatch,
@@ -75,7 +75,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.resetModules();
   vi.doUnmock("../storage/index");
-  vi.doUnmock("../grok/batch");
+  vi.doUnmock("../crow/batch");
 });
 
 describe("Agent batch mode", () => {

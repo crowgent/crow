@@ -39,7 +39,7 @@ function normalizeTrustEntry(value: unknown): WorkspaceTrustEntry | null {
 }
 
 export function getWorkspaceTrustPath(homeDir = os.homedir()): string {
-  return path.join(homeDir, ".grok", WORKSPACE_TRUST_FILENAME);
+  return path.join(homeDir, ".crow", WORKSPACE_TRUST_FILENAME);
 }
 
 export function getWorkspaceTrustKey(cwd = process.cwd()): string {

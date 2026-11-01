@@ -4,9 +4,9 @@ globs: "**/*"
 alwaysApply: true
 ---
 
-# Grok CLI — Project Overview
+# Crow — Project Overview
 
-Grok CLI (`@vibe-kit/grok-cli`) is an open-source AI coding agent powered by Grok that brings AI assistance directly into the terminal.
+Crow is an open-source AI coding agent powered by Grok that brings AI assistance directly into the terminal.
 
 ## Tech Stack
 
@@ -26,7 +26,7 @@ src/
 ├── index.ts          # CLI entry point (Commander.js + OpenTUI)
 ├── agent/
 │   └── agent.ts      # Agent — orchestrates client, bash tool, search
-├── grok/
+├── crow/
 │   ├── client.ts     # Grok API client (Chat Completions + Responses API)
 │   ├── models.ts     # Model definitions and metadata
 │   └── tools.ts      # Tool schemas (bash, search_web, search_x)
@@ -47,8 +47,8 @@ src/
 - **Agent loop**: `Agent.processMessage()` is an async generator that yields `StreamChunk` objects — the LLM responds, tools execute, results feed back until no more tool calls remain.
 - **Bash-only tools**: The agent uses bash for everything (file editing, searching, git, builds, etc.).
 - **X Search & Web Search**: Integrated via the xAI Responses API for real-time information.
-- **Settings hierarchy**: Environment variables → User-level (`~/.grok/user-settings.json`) → Project-level (`.grok/settings.json`).
-- **Custom instructions**: `~/.grok/AGENTS.md`, then `AGENTS.override.md` / `AGENTS.md` per directory from git root through the workspace cwd (Codex-style merge).
+- **Settings hierarchy**: Environment variables → User-level (`~/.crow/user-settings.json`) → Project-level (`.crow/settings.json`).
+- **Custom instructions**: `~/.crow/AGENTS.md`, then `AGENTS.override.md` / `AGENTS.md` per directory from git root through the workspace cwd (Codex-style merge).
 - **ESM only**: The project uses `"type": "module"` — all imports use `.js` extensions for compiled output.
 
 ## Latest Grok Models

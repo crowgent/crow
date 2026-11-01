@@ -13,7 +13,7 @@ function makeTempDir(prefix: string): string {
 }
 
 function readStoredDelegationRecord(home: string): Record<string, unknown> {
-  const delegationsRoot = path.join(home, ".grok", "delegations");
+  const delegationsRoot = path.join(home, ".crow", "delegations");
   const projectDirs = fs.readdirSync(delegationsRoot);
   expect(projectDirs).toHaveLength(1);
   const projectDir = path.join(delegationsRoot, projectDirs[0] as string);
@@ -55,8 +55,8 @@ afterEach(() => {
 
 describe("DelegationManager sandbox propagation", () => {
   it("persists sandbox mode in background delegation records", async () => {
-    const home = makeTempDir("grok-delegation-home-");
-    const cwd = makeTempDir("grok-delegation-cwd-");
+    const home = makeTempDir("crow-delegation-home-");
+    const cwd = makeTempDir("crow-delegation-cwd-");
     const spawnMock = vi.fn(() => ({
       pid: 2468,
       unref: vi.fn(),
@@ -71,7 +71,7 @@ describe("DelegationManager sandbox propagation", () => {
         prompt: "Find the execution path.",
       },
       {
-        model: "grok-test-model",
+        model: "crow-test-model",
         sandboxMode: "shuru",
         maxToolRounds: 25,
         maxTokens: 2048,
@@ -95,8 +95,8 @@ describe("DelegationManager sandbox propagation", () => {
   });
 
   it("persists sandbox settings in background delegation records", async () => {
-    const home = makeTempDir("grok-delegation-home-");
-    const cwd = makeTempDir("grok-delegation-cwd-");
+    const home = makeTempDir("crow-delegation-home-");
+    const cwd = makeTempDir("crow-delegation-cwd-");
     const spawnMock = vi.fn(() => ({
       pid: 3579,
       unref: vi.fn(),
@@ -118,7 +118,7 @@ describe("DelegationManager sandbox propagation", () => {
         prompt: "Look around",
       },
       {
-        model: "grok-test-model",
+        model: "crow-test-model",
         sandboxMode: "shuru",
         sandboxSettings,
         maxToolRounds: 25,

@@ -12,17 +12,17 @@ import {
   createBatch,
   getBatchChatCompletion,
   pollBatchRequestResult,
-} from "../grok/batch";
+} from "../crow/batch";
 import {
   createProvider,
   generateRecap as genRecap,
   generateTitle as genTitle,
   resolveModelRuntime,
   type XaiProvider,
-} from "../grok/client";
-import { DEFAULT_MODEL, getModelInfo, normalizeModelId } from "../grok/models";
-import { toolSetToBatchTools } from "../grok/tool-schemas";
-import { createTools } from "../grok/tools";
+} from "../crow/client";
+import { DEFAULT_MODEL, getModelInfo, normalizeModelId } from "../crow/models";
+import { toolSetToBatchTools } from "../crow/tool-schemas";
+import { createTools } from "../crow/tools";
 import { executeEventHooks } from "../hooks/index";
 import type {
   NotificationHookInput,
@@ -166,7 +166,7 @@ You are running inside a terminal (CLI). Your text output is rendered in a plain
 - Never use unicode box-drawing, fancy borders, or ASCII art in your responses.`;
 
 const MODE_PROMPTS: Record<AgentMode, string> = {
-  agent: `You are Grok CLI in Agent mode — a powerful AI coding agent. You execute tasks directly using tools.
+  agent: `You are Crow in Agent mode — a powerful AI coding agent. You execute tasks directly using tools.
 
 ${ENVIRONMENT}
 
@@ -262,7 +262,7 @@ IMPORTANT:
 
 Be direct. Execute, don't just describe. Show results, not plans.`,
 
-  plan: `You are Grok CLI in Plan mode — you analyze and plan but DO NOT execute changes.
+  plan: `You are Crow in Plan mode — you analyze and plan but DO NOT execute changes.
 
 ${ENVIRONMENT}
 
@@ -284,7 +284,7 @@ BEHAVIOR:
 - Highlight potential risks, edge cases, and dependencies in the plan summary
 - NEVER create, modify, or delete files — only read and analyze`,
 
-  ask: `You are Grok CLI in Ask mode — you answer questions clearly and thoroughly.
+  ask: `You are Crow in Ask mode — you answer questions clearly and thoroughly.
 
 ${ENVIRONMENT}
 
@@ -321,7 +321,7 @@ function formatCustomSubagentsPromptSection(subagents: CustomSubagentConfig[]): 
     return `### ${agent.name}\n- model: ${agent.model}\n- instruction:\n${instruction}`;
   });
 
-  return `\n\nCUSTOM SUB-AGENTS:\nUser-defined foreground sub-agents from ~/.grok/user-settings.json. When one matches the task, call the task tool with agent set to the exact name.\n\n${lines.join("\n\n")}\n`;
+  return `\n\nCUSTOM SUB-AGENTS:\nUser-defined foreground sub-agents from ~/.crow/user-settings.json. When one matches the task, call the task tool with agent set to the exact name.\n\n${lines.join("\n\n")}\n`;
 }
 
 function buildSystemPrompt(
@@ -375,7 +375,7 @@ function buildSubagentPrompt(
         : isVerifyDetect
           ? "You are the Verify Detect sub-agent. You inspect a repository to produce a structured verification recipe. You are read-only."
           : isVerifyManifest
-            ? "You are the Verify Manifest sub-agent. You inspect a repository and create or update .grok/environment.json so verification can run reproducibly."
+            ? "You are the Verify Manifest sub-agent. You inspect a repository and create or update .crow/environment.json so verification can run reproducibly."
             : isVerify
               ? "You are the Verify sub-agent. You specialize in sandbox-aware local verification using builds, tests, app boot checks, and optional browser smoke tests."
               : isComputer
@@ -396,9 +396,9 @@ function buildSubagentPrompt(
         ]
       : isVerifyManifest
         ? [
-            "Focus on creating or updating .grok/environment.json as the primary verification contract for this repository.",
-            "Read package.json and key config files to understand the project, then write .grok/environment.json.",
-            "Prefer editing only .grok/environment.json unless the delegated task explicitly requires something else.",
+            "Focus on creating or updating .crow/environment.json as the primary verification contract for this repository.",
+            "Read package.json and key config files to understand the project, then write .crow/environment.json.",
+            "Prefer editing only .crow/environment.json unless the delegated task explicitly requires something else.",
             "",
             "SANDBOX ENVIRONMENT (Shuru):",
             "- OS: Debian GNU/Linux 13 (trixie)",
@@ -1197,7 +1197,7 @@ export class Agent {
       !isComputer &&
       !custom
     ) {
-      const message = `Unknown sub-agent "${agentKey}". Use general, explore, vision, verify, verify-detect, verify-manifest, computer, or a configured name from ~/.grok/user-settings.json.`;
+      const message = `Unknown sub-agent "${agentKey}". Use general, explore, vision, verify, verify-detect, verify-manifest, computer, or a configured name from ~/.crow/user-settings.json.`;
       return {
         success: false,
         output: message,
@@ -1300,7 +1300,7 @@ export class Agent {
 
       const childPrompt =
         isVerify && verifyPreparedRecipe
-          ? `${request.prompt}\n\nPrepared verify recipe JSON (use this as the primary execution recipe and keep .grok/environment.json aligned with it if present):\n${JSON.stringify(verifyPreparedRecipe, null, 2)}`
+          ? `${request.prompt}\n\nPrepared verify recipe JSON (use this as the primary execution recipe and keep .crow/environment.json aligned with it if present):\n${JSON.stringify(verifyPreparedRecipe, null, 2)}`
           : request.prompt;
 
       const childMessages = isVision
@@ -2282,7 +2282,7 @@ function buildBatchName(prefix: string, label: string): string {
       .replace(/\s+/g, "-")
       .replace(/[^a-zA-Z0-9._-]+/g, "")
       .slice(0, 48) || "run";
-  return `grok-cli-${prefix}-${compact}`;
+  return `crow-${prefix}-${compact}`;
 }
 
 function buildBatchChatCompletionRequest(args: {

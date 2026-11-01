@@ -5,7 +5,7 @@ import readline from "readline";
 import packageJson from "../package.json";
 import { Agent } from "./agent/agent";
 import { completeDelegation, failDelegation, loadDelegation } from "./agent/delegations";
-import { MODELS, normalizeModelId } from "./grok/models";
+import { MODELS, normalizeModelId } from "./crow/models";
 import {
   createHeadlessJsonlEmitter,
   type HeadlessOutputFormat,
@@ -196,12 +196,12 @@ async function promptWorkspaceTrust(
   const message = sandboxSupported
     ? [
         "",
-        `Grok has not been run in ${cwd} before.`,
+        `Crow has not been run in ${cwd} before.`,
         "",
         "Sandbox mode isolates agent shell commands in a Shuru microVM so",
         "untrusted repos cannot touch your host filesystem or network by default.",
         "",
-        "Run grok in sandbox mode for this directory?",
+        "Run crow in sandbox mode for this directory?",
         "",
         "  [Y] Yes, always in sandbox",
         "  [n] No, run on host",
@@ -211,11 +211,11 @@ async function promptWorkspaceTrust(
       ].join("\n")
     : [
         "",
-        `Grok has not been run in ${cwd} before.`,
+        `Crow has not been run in ${cwd} before.`,
         "",
         "Sandbox mode is only available on macOS Apple Silicon in this version.",
         "",
-        "Run grok directly on the host for this directory?",
+        "Run crow directly on the host for this directory?",
         "",
         "  [Y] Yes, remember host mode",
         "  [s] Yes, this session only",
@@ -236,7 +236,7 @@ async function promptWorkspaceTrust(
 
 async function resolveWorkspaceTrustSandboxMode(sandboxMode: SandboxMode, options: CliOptions): Promise<SandboxMode> {
   if (sandboxMode === "shuru" || hasExplicitSandboxOption(options)) return sandboxMode;
-  if (process.env.GROK_TRUST_WORKSPACE) return sandboxMode;
+  if (process.env.CROW_TRUST_WORKSPACE) return sandboxMode;
 
   const cwd = process.cwd();
   const saved = getWorkspaceTrustDecision(cwd);
@@ -256,7 +256,7 @@ async function runBackgroundDelegation(jobPath: string, options: CliOptions) {
     const delegation = await loadDelegation(jobPath);
     const apiKey = stringOption(options.apiKey) || getApiKey();
     if (!apiKey) {
-      throw new Error("API key required. Set GROK_API_KEY, use --api-key, or save it to ~/.grok/user-settings.json.");
+      throw new Error("API key required. Set GROK_API_KEY, use --api-key, or save it to ~/.crow/user-settings.json.");
     }
 
     const baseURL = stringOption(options.baseUrl) || getBaseURL();
@@ -329,7 +329,7 @@ function resolveConfig(options: CliOptions) {
 function requireApiKey(apiKey: string | undefined): string {
   if (!apiKey) {
     console.error(
-      "Error: API key required. Set GROK_API_KEY env var, use --api-key, or save to ~/.grok/user-settings.json",
+      "Error: API key required. Set GROK_API_KEY env var, use --api-key, or save to ~/.crow/user-settings.json",
     );
     process.exit(1);
   }
@@ -346,7 +346,7 @@ function parseHeadlessOutputFormat(value: string): HeadlessOutputFormat {
 }
 
 program
-  .name("grok")
+  .name("crow")
   .description("AI coding agent powered by Grok — built with Bun and OpenTUI")
   .version(packageJson.version)
   .argument("[message...]", "Initial message to send")
@@ -366,7 +366,7 @@ program
   .option("--background-task-file <path>", "Run a persisted background delegation")
   .option("--max-tool-rounds <n>", "Max tool execution rounds", "400")
   .option("--batch-api", "Use xAI Batch API for model calls (async, lower cost)")
-  .option("--update", "Update grok to the latest version and exit")
+  .option("--update", "Update crow to the latest version and exit")
   .action(async (message: string[], options) => {
     if (options.update) {
       console.log("Checking for updates...");
@@ -495,7 +495,7 @@ program
 
 program
   .command("update")
-  .description("Update Grok to the latest release")
+  .description("Update Crow to the latest release")
   .action(async () => {
     console.log("Checking for updates...");
     const result = await runUpdate(packageJson.version);
@@ -505,11 +505,11 @@ program
 
 program
   .command("uninstall")
-  .description("Remove a script-installed Grok binary and optional data")
+  .description("Remove a script-installed Crow binary and optional data")
   .option("--dry-run", "Show what would be removed without removing it")
   .option("--force", "Skip the confirmation prompt")
-  .option("--keep-config", "Keep ~/.grok config files")
-  .option("--keep-data", "Keep ~/.grok data files")
+  .option("--keep-config", "Keep ~/.crow config files")
+  .option("--keep-data", "Keep ~/.crow data files")
   .action(async (options) => {
     const result = await runScriptManagedUninstall({
       dryRun: options.dryRun === true,
@@ -543,7 +543,7 @@ walletCommand
     console.log(`  Address: ${data.address}`);
     console.log(`  Chain:   ${data.chain}`);
     console.log(`  Created: ${data.createdAt}`);
-    console.log("\nPayments have been enabled in ~/.grok/user-settings.json.");
+    console.log("\nPayments have been enabled in ~/.crow/user-settings.json.");
   });
 
 walletCommand

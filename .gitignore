@@ -99,8 +99,8 @@ temp/
 
 # Coding agents
 .claude/
-.grok/*
-.grok/
+.crow/*
+.crow/
 
 # Cursor config (tracked — do not ignore)
 # .cursor/

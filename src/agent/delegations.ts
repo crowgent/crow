@@ -53,7 +53,7 @@ export class DelegationManager {
   constructor(private readonly getCwd: () => string) {}
 
   async start(request: TaskRequest, options: StartDelegationOptions): Promise<ToolResult> {
-    if (process.env.GROK_BACKGROUND_CHILD === "1") {
+    if (process.env.CROW_BACKGROUND_CHILD === "1") {
       return {
         success: false,
         output: "Nested background delegations are disabled.",
@@ -107,7 +107,7 @@ export class DelegationManager {
         cwd,
         detached: true,
         stdio: "ignore",
-        env: { ...process.env, GROK_BACKGROUND_CHILD: "1" },
+        env: { ...process.env, CROW_BACKGROUND_CHILD: "1" },
       },
     );
     child.unref();
@@ -228,7 +228,7 @@ export async function failDelegation(jobPath: string, error: string, output = ""
 
 async function ensureDelegationsDir(cwd: string): Promise<string> {
   const projectId = getProjectId(cwd);
-  const dir = path.join(os.homedir(), ".grok", "delegations", projectId);
+  const dir = path.join(os.homedir(), ".crow", "delegations", projectId);
   await fs.mkdir(dir, { recursive: true });
   return dir;
 }

@@ -1,6 +1,6 @@
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { type RefObject, useEffect, useRef } from "react";
-import { MODELS } from "../grok/models";
+import { MODELS } from "../crow/models";
 import type { CustomSubagentConfig } from "../utils/settings";
 import { formatSubagentName } from "../utils/subagent-display";
 import type { Theme } from "./theme";

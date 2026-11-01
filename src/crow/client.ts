@@ -7,7 +7,7 @@ import { getEffectiveReasoningEffort, getModelInfo, normalizeModelId } from "./m
 export type XaiProvider = ReturnType<typeof createXai>;
 export type XaiChatModel = ReturnType<XaiProvider>;
 export type XaiResponsesModel = ReturnType<XaiProvider["responses"]>;
-export type GrokRuntimeModel = XaiChatModel | XaiResponsesModel;
+export type CrowRuntimeModel = XaiChatModel | XaiResponsesModel;
 
 const DEFAULT_TITLE_MODEL = "grok-4.20-non-reasoning";
 const DEFAULT_RECAP_MODEL = "grok-4.20-non-reasoning";
@@ -30,7 +30,7 @@ export interface GeneratedRecap extends GeneratedTextResult {
 }
 
 export interface ResolvedModelRuntime {
-  model: GrokRuntimeModel;
+  model: CrowRuntimeModel;
   modelId: string;
   modelInfo?: ModelInfo;
   providerOptions?: {

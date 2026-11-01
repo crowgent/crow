@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP="grok"
-REPO="superagent-ai/grok-cli"
+APP="crow"
+REPO="crowgent/crow"
 RELEASES_API="https://api.github.com/repos/${REPO}/releases"
-USER_DIR="${HOME}/.grok"
+USER_DIR="${HOME}/.crow"
 INSTALL_DIR="${USER_DIR}/bin"
 METADATA_PATH="${USER_DIR}/install.json"
-PATH_MARKER="# grok"
+PATH_MARKER="# crow"
 
 requested_version=""
 binary_path=""
@@ -17,12 +17,12 @@ written_path_command=""
 
 usage() {
   cat <<'EOF'
-Install Grok from GitHub Releases.
+Install Crow from GitHub Releases.
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/superagent-ai/grok-cli/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/superagent-ai/grok-cli/main/install.sh | bash -s -- --version 1.1.4
-  bash install.sh --binary /path/to/grok
+  curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash -s -- --version 1.1.4
+  bash install.sh --binary /path/to/crow
 
 Options:
   -v, --version <version>  Install a specific version
@@ -101,11 +101,11 @@ resolve_target() {
 
   TARGET="${OS}-${ARCH}"
   if [[ "$TARGET" == windows-* ]]; then
-    ASSET_NAME="grok-${TARGET}.exe"
-    BINARY_NAME="grok.exe"
+    ASSET_NAME="crow-${TARGET}.exe"
+    BINARY_NAME="crow.exe"
   else
-    ASSET_NAME="grok-${TARGET}"
-    BINARY_NAME="grok"
+    ASSET_NAME="crow-${TARGET}"
+    BINARY_NAME="crow"
   fi
 }
 
@@ -245,7 +245,7 @@ EOF
 resolve_release_version() {
   if [[ -n "$requested_version" ]]; then
     RESOLVED_VERSION="${requested_version}"
-    RELEASE_BASE_URL="https://github.com/${REPO}/releases/download/grok-dev@${RESOLVED_VERSION}"
+    RELEASE_BASE_URL="https://github.com/${REPO}/releases/download/crow@${RESOLVED_VERSION}"
     return
   fi
 
@@ -253,9 +253,9 @@ resolve_release_version() {
   tag=$(curl -fsSL "${RELEASES_API}/latest" \
     | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
     | head -n 1)
-  RESOLVED_VERSION="${tag#grok-dev@}"
+  RESOLVED_VERSION="${tag#crow@}"
   if [[ -z "$RESOLVED_VERSION" ]]; then
-    echo "Failed to resolve the latest Grok release version." >&2
+    echo "Failed to resolve the latest Crow release version." >&2
     exit 1
   fi
   RELEASE_BASE_URL="https://github.com/${REPO}/releases/latest/download"
@@ -264,7 +264,7 @@ resolve_release_version() {
 
 install_downloaded_release() {
   local tmp_dir binary_file checksum_file
-  tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/grok-install.XXXXXX")
+  tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/crow-install.XXXXXX")
   trap "rm -rf \"$tmp_dir\"" EXIT
 
   binary_file="${tmp_dir}/${ASSET_NAME}"
@@ -307,11 +307,11 @@ resolve_installed_version
 write_metadata "$INSTALLED_VERSION"
 
 echo ""
-echo "Grok ${INSTALLED_VERSION} installed to ${INSTALL_DIR}/${BINARY_NAME}"
+echo "Crow ${INSTALLED_VERSION} installed to ${INSTALL_DIR}/${BINARY_NAME}"
 echo ""
 echo "Run:"
-echo "  grok --help"
+echo "  crow --help"
 echo ""
 echo "To uninstall later:"
-echo "  grok uninstall"
+echo "  crow uninstall"
 echo ""

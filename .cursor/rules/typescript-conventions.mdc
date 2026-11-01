@@ -12,7 +12,7 @@ alwaysApply: false
 - Always use ES module `import`/`export` syntax — never `require()`.
 - When importing local modules, include the `.js` extension (TypeScript compiles `.ts` → `.js`):
   ```typescript
-  import { GrokAgent } from "./agent/grok-agent.js";
+  import { CrowAgent } from "./agent/crow-agent.js";
   ```
 
 ## TypeScript Configuration
@@ -24,7 +24,7 @@ alwaysApply: false
 
 ## Type Practices
 
-- Prefer explicit interfaces for public API boundaries (e.g. `ChatEntry`, `ToolResult`, `GrokToolCall`).
+- Prefer explicit interfaces for public API boundaries (e.g. `ChatEntry`, `ToolResult`, `CrowToolCall`).
 - Use `type` imports when importing only types:
   ```typescript
   import type { ChatCompletionMessageParam } from "openai/resources/chat";
@@ -34,11 +34,11 @@ alwaysApply: false
 
 ## Naming Conventions
 
-- **Files**: kebab-case (`grok-agent.ts`, `chat-interface.tsx`, `settings-manager.ts`).
-- **Classes**: PascalCase (`GrokAgent`, `TextEditorTool`, `BashTool`).
+- **Files**: kebab-case (`crow-agent.ts`, `chat-interface.tsx`, `settings-manager.ts`).
+- **Classes**: PascalCase (`CrowAgent`, `TextEditorTool`, `BashTool`).
 - **Interfaces/Types**: PascalCase (`ChatEntry`, `ToolResult`, `StreamingChunk`).
 - **Functions/variables**: camelCase (`processUserMessage`, `loadApiKey`).
-- **Constants**: camelCase or UPPER_SNAKE_CASE for true constants (`GROK_TOOLS`).
+- **Constants**: camelCase or UPPER_SNAKE_CASE for true constants (`CROW_TOOLS`).
 
 ## Error Handling
 

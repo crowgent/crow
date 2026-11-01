@@ -2,14 +2,14 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GrokSttEngine, inferMimeTypeFromFileName } from "./grok-stt";
+import { CrowSttEngine, inferMimeTypeFromFileName } from "./crow-stt";
 
-describe("GrokSttEngine", () => {
+describe("CrowSttEngine", () => {
   let tempDir: string;
   const originalFetch = global.fetch;
 
   beforeEach(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "grok-stt-test-"));
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "crow-stt-test-"));
   });
 
   afterEach(() => {
@@ -19,8 +19,8 @@ describe("GrokSttEngine", () => {
   });
 
   it("requires an API key", () => {
-    expect(() => new GrokSttEngine({ apiKey: "" })).toThrow(/API key/i);
-    expect(() => new GrokSttEngine({ apiKey: "   " })).toThrow(/API key/i);
+    expect(() => new CrowSttEngine({ apiKey: "" })).toThrow(/API key/i);
+    expect(() => new CrowSttEngine({ apiKey: "   " })).toThrow(/API key/i);
   });
 
   it("posts the audio file as multipart form-data to /v1/stt", async () => {
@@ -40,7 +40,7 @@ describe("GrokSttEngine", () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const engine = new GrokSttEngine({
+    const engine = new CrowSttEngine({
       apiKey: "test-key",
       baseURL: "https://api.x.ai/v1/",
       language: "en",
@@ -84,7 +84,7 @@ describe("GrokSttEngine", () => {
     );
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const engine = new GrokSttEngine({ apiKey: "test-key" });
+    const engine = new CrowSttEngine({ apiKey: "test-key" });
     await engine.transcribe({ audioPath });
 
     const body = (fetchMock.mock.calls[0] as [string, RequestInit])[1].body as FormData;
@@ -102,7 +102,7 @@ describe("GrokSttEngine", () => {
         new Response("invalid audio", { status: 400, statusText: "Bad Request" }),
       ) as unknown as typeof fetch;
 
-    const engine = new GrokSttEngine({ apiKey: "test-key" });
+    const engine = new CrowSttEngine({ apiKey: "test-key" });
     await expect(engine.transcribe({ audioPath })).rejects.toThrow(/Grok STT request failed \(400\).*invalid audio/);
   });
 
@@ -117,7 +117,7 @@ describe("GrokSttEngine", () => {
       }),
     ) as unknown as typeof fetch;
 
-    const engine = new GrokSttEngine({ apiKey: "test-key" });
+    const engine = new CrowSttEngine({ apiKey: "test-key" });
     await expect(engine.transcribe({ audioPath })).rejects.toThrow(/empty transcript/i);
   });
 });

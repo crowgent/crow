@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { DEFAULT_MODEL, getEffectiveReasoningEffort, getModelIds, normalizeModelId } from "../grok/models";
+import { DEFAULT_MODEL, getEffectiveReasoningEffort, getModelIds, normalizeModelId } from "../crow/models";
 import type { HooksConfig } from "../hooks/types";
 import type {
   LspBuiltInServerId,
@@ -182,7 +182,7 @@ export interface ProjectSettings {
   lsp?: LspSettings;
 }
 
-const USER_DIR = path.join(os.homedir(), ".grok");
+const USER_DIR = path.join(os.homedir(), ".crow");
 const USER_SETTINGS_PATH = path.join(USER_DIR, "user-settings.json");
 
 function ensureDir(dir: string): void {
@@ -286,12 +286,12 @@ export function saveUserSettings(partial: Partial<UserSettings>): void {
 }
 
 export function loadProjectSettings(): ProjectSettings {
-  const projectPath = path.join(process.cwd(), ".grok", "settings.json");
+  const projectPath = path.join(process.cwd(), ".crow", "settings.json");
   return readJson<ProjectSettings>(projectPath) || {};
 }
 
 export function saveProjectSettings(partial: Partial<ProjectSettings>): void {
-  const projectPath = path.join(process.cwd(), ".grok", "settings.json");
+  const projectPath = path.join(process.cwd(), ".crow", "settings.json");
   const current = loadProjectSettings();
   writeJson(projectPath, {
     ...current,

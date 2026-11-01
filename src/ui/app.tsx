@@ -12,7 +12,7 @@ import {
   getSupportedReasoningEfforts,
   MODELS,
   normalizeModelId,
-} from "../grok/models";
+} from "../crow/models";
 import { parseEnvLines, parseHeaderLines } from "../mcp/parse-headers";
 import { toMcpServerId, validateMcpServerConfig } from "../mcp/validate";
 import { createTelegramBridge, type TelegramBridgeHandle } from "../telegram/bridge";
@@ -105,7 +105,7 @@ const PROMPT_LOADING_FRAMES = [
 ] as const;
 
 type Star = { col: number; ch: string };
-type Row = { stars: Star[]; grok?: number };
+type Row = { stars: Star[]; crow?: number };
 type ContextStats = {
   contextWindow: number;
   usedTokens: number;
@@ -162,7 +162,7 @@ const HERO_ROWS: Row[] = [
       { col: 19, ch: "·" },
       { col: 27, ch: "·" },
     ],
-    grok: 13,
+    crow: 13,
   },
   {
     stars: [
@@ -213,14 +213,14 @@ function HeroLogo({ t }: { t: Theme }) {
         let cursor = 0;
 
         for (const star of row.stars) {
-          if (row.grok !== undefined && cursor <= row.grok && star.col > row.grok) {
-            els.push(" ".repeat(row.grok - cursor));
+          if (row.crow !== undefined && cursor <= row.crow && star.col > row.crow) {
+            els.push(" ".repeat(row.crow - cursor));
             els.push(
-              <span key="grok" style={{ fg: t.primary }}>
-                {"Grok"}
+              <span key="crow" style={{ fg: t.primary }}>
+                {"Crow"}
               </span>,
             );
-            cursor = row.grok + 4;
+            cursor = row.crow + 4;
           }
           const gap = star.col - cursor;
           if (gap > 0) els.push(" ".repeat(gap));
@@ -232,14 +232,14 @@ function HeroLogo({ t }: { t: Theme }) {
           cursor = star.col + 1;
         }
 
-        if (row.grok !== undefined && cursor <= row.grok) {
-          els.push(" ".repeat(row.grok - cursor));
+        if (row.crow !== undefined && cursor <= row.crow) {
+          els.push(" ".repeat(row.crow - cursor));
           els.push(
-            <span key="grok" style={{ fg: t.primary }}>
-              {"Grok"}
+            <span key="crow" style={{ fg: t.primary }}>
+              {"Crow"}
             </span>,
           );
-          cursor = row.grok + 4;
+          cursor = row.crow + 4;
         }
 
         els.push(" ".repeat(Math.max(0, 35 - cursor)));
@@ -559,7 +559,7 @@ ${prompt}`;
 }
 
 const CONNECT_CHANNELS: { id: string; label: string; description: string }[] = [
-  { id: "telegram", label: "Telegram", description: "Chat with Grok from Telegram" },
+  { id: "telegram", label: "Telegram", description: "Chat with Crow from Telegram" },
 ];
 
 const MCP_REMOTE_FIELDS: McpEditorField[] = ["transport", "label", "url", "headers", "env"];
@@ -1882,7 +1882,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       },
     ]);
     try {
-      await bridgeRef.current?.sendDm(result.userId, "Pairing approved. You can message Grok here.");
+      await bridgeRef.current?.sendDm(result.userId, "Pairing approved. You can message Crow here.");
     } catch {
       /* optional DM */
     }
@@ -3890,7 +3890,7 @@ function PromptBox({
                 !showApiKeyModal &&
                 !blockPrompt
               }
-              placeholder={isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Grok..."}
+              placeholder={isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Crow..."}
               textColor={t.text}
               backgroundColor={t.backgroundElement}
               placeholderColor={t.textMuted}
@@ -4937,7 +4937,7 @@ function UpdateModal({
         </box>
         <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
           <text fg={t.text}>
-            {"A new version of grok is available: "}
+            {"A new version of crow is available: "}
             <span style={{ fg: t.textMuted }}>
               {"v"}
               {currentVersion}
@@ -5169,7 +5169,7 @@ function TelegramTokenModal({
         </box>
         <box paddingLeft={2} paddingRight={2} paddingTop={1}>
           <text fg={t.text}>
-            {"From @BotFather: /newbot, then paste the token here. Stored in ~/.grok/user-settings.json."}
+            {"From @BotFather: /newbot, then paste the token here. Stored in ~/.crow/user-settings.json."}
           </text>
         </box>
         <box paddingLeft={2} paddingRight={2} paddingTop={1}>

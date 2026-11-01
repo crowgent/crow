@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "@vibe-kit/grok-cli",
+      "name": "crow",
       "dependencies": {
         "@ai-sdk/mcp": "^1.0.25",
         "@ai-sdk/provider-utils": "^4.0.21",

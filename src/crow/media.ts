@@ -4,7 +4,7 @@ import { dirname, extname, isAbsolute, join, resolve } from "path";
 import type { MediaAsset, ToolResult } from "../types/index";
 import type { XaiProvider } from "./client";
 
-const GENERATED_MEDIA_DIR = ".grok/generated-media";
+const GENERATED_MEDIA_DIR = ".crow/generated-media";
 const IMAGE_MODEL_ID = "grok-imagine-image";
 const VIDEO_MODEL_ID = "grok-imagine-video";
 

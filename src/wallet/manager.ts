@@ -7,7 +7,7 @@ import { base, baseSepolia } from "viem/chains";
 import type { PaymentChain } from "../utils/settings";
 import type { WalletBalance, WalletData } from "./types";
 
-const WALLET_DIR = path.join(os.homedir(), ".grok");
+const WALLET_DIR = path.join(os.homedir(), ".crow");
 const WALLET_PATH = path.join(WALLET_DIR, "wallet.json");
 
 const USDC_BY_CHAIN: Record<PaymentChain, `0x${string}`> = {
@@ -61,7 +61,7 @@ export class WalletManager {
 
   getStoredWallet(): StoredWallet {
     if (!WalletManager.exists()) {
-      throw new Error("No wallet found. Run `grok wallet init` first.");
+      throw new Error("No wallet found. Run `crow wallet init` first.");
     }
     const parsed = JSON.parse(fs.readFileSync(WALLET_PATH, "utf-8")) as Partial<StoredWallet>;
     if (!parsed.privateKey || !parsed.address || !parsed.chain || !parsed.createdAt) {

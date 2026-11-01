@@ -1,21 +1,21 @@
 import { readFile } from "fs/promises";
 import path from "path";
 
-export const DEFAULT_GROK_STT_BASE_URL = "https://api.x.ai/v1";
+export const DEFAULT_CROW_STT_BASE_URL = "https://api.x.ai/v1";
 
-export interface GrokSttEngineConfig {
+export interface CrowSttEngineConfig {
   apiKey: string;
   baseURL?: string;
   language?: string;
 }
 
-export interface GrokSttTranscriptionInput {
+export interface CrowSttTranscriptionInput {
   audioPath: string;
   fileName?: string;
   mimeType?: string;
 }
 
-export interface GrokSttWord {
+export interface CrowSttWord {
   text: string;
   start: number;
   end: number;
@@ -23,24 +23,24 @@ export interface GrokSttWord {
   speaker?: number;
 }
 
-export interface GrokSttTranscriptionResult {
+export interface CrowSttTranscriptionResult {
   text: string;
   engine: "grok-stt";
   language: string;
   duration: number;
-  words?: GrokSttWord[];
+  words?: CrowSttWord[];
 }
 
-export class GrokSttEngine {
-  constructor(private readonly config: GrokSttEngineConfig) {
+export class CrowSttEngine {
+  constructor(private readonly config: CrowSttEngineConfig) {
     if (!config.apiKey?.trim()) {
       throw new Error(
-        "Grok STT requires an API key. Set GROK_API_KEY or configure apiKey in ~/.grok/user-settings.json.",
+        "Grok STT requires an API key. Set GROK_API_KEY or configure apiKey in ~/.crow/user-settings.json.",
       );
     }
   }
 
-  async transcribe(input: GrokSttTranscriptionInput): Promise<GrokSttTranscriptionResult> {
+  async transcribe(input: CrowSttTranscriptionInput): Promise<CrowSttTranscriptionResult> {
     const bytes = await readFile(input.audioPath);
     const fileName = input.fileName || path.basename(input.audioPath);
     const mimeType = input.mimeType || inferMimeTypeFromFileName(fileName);
@@ -73,7 +73,7 @@ export class GrokSttEngine {
       text?: string;
       language?: string;
       duration?: number;
-      words?: GrokSttWord[];
+      words?: CrowSttWord[];
     };
 
     const text = typeof payload.text === "string" ? payload.text.trim() : "";
@@ -118,7 +118,7 @@ export function inferMimeTypeFromFileName(fileName: string): string {
 }
 
 function normalizeBaseURL(baseURL?: string): string {
-  const value = baseURL?.trim() || DEFAULT_GROK_STT_BASE_URL;
+  const value = baseURL?.trim() || DEFAULT_CROW_STT_BASE_URL;
   return value.replace(/\/+$/, "");
 }
 

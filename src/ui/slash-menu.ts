@@ -23,7 +23,7 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "verify", label: "verify", description: "Run local verification" },
   { id: "skills", label: "skills", description: "Manage skills" },
   { id: "btw", label: "btw", description: "Ask a side question without interrupting" },
-  { id: "update", label: "update", description: "Update grok to the latest version" },
+  { id: "update", label: "update", description: "Update crow to the latest version" },
 ];
 
 export function filterSlashMenuItems(items: SlashMenuItem[], query: string): SlashMenuItem[] {

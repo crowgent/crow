@@ -414,7 +414,7 @@ export function createTools(
         output_path: z
           .string()
           .optional()
-          .describe("Optional output path for the screenshot. Defaults to .grok/computer/*.png"),
+          .describe("Optional output path for the screenshot. Defaults to .crow/computer/*.png"),
         app: z.string().optional().describe("Optional application name to capture"),
         window_id: z.string().optional().describe("Optional window id from computer_list_windows"),
       }),
@@ -636,10 +636,10 @@ export function createTools(
 
       tools.schedule_create = tool({
         description:
-          "Create a recurring or one-time scheduled headless Grok run. Provide a name, the instruction to run, and a cron expression for recurring schedules. Omit cron for an immediate one-time run.",
+          "Create a recurring or one-time scheduled headless Crow run. Provide a name, the instruction to run, and a cron expression for recurring schedules. Omit cron for an immediate one-time run.",
         inputSchema: z.object({
           name: z.string().describe("Human-readable schedule name"),
-          instruction: z.string().describe("The prompt/instruction Grok should run headlessly"),
+          instruction: z.string().describe("The prompt/instruction Crow should run headlessly"),
           cron: z.string().optional().describe("Cron expression for recurring schedules, such as '0 9 * * 1-5'"),
           model: z.string().optional().describe("Optional model override; defaults to the current selected model"),
           directory: z.string().optional().describe("Optional working directory; defaults to the current directory"),
@@ -810,7 +810,7 @@ export function createTools(
       try {
         const { WalletManager } = await import("../wallet/manager");
         if (!WalletManager.exists()) {
-          return { success: false, output: "No wallet found. Run `grok wallet init` to create one." };
+          return { success: false, output: "No wallet found. Run `crow wallet init` to create one." };
         }
         const wm = new WalletManager();
         const balance = await wm.getBalance();
@@ -993,7 +993,7 @@ function formatScheduleList(schedules: StoredSchedule[], daemonStatus: ScheduleD
 
   if (!daemonStatus.running) {
     lines.push("");
-    lines.push("Start `grok daemon` to run recurring schedules.");
+    lines.push("Start `crow daemon` to run recurring schedules.");
   }
 
   return lines.join("\n");
@@ -1003,5 +1003,5 @@ function formatDaemonReminder(status: ScheduleDaemonStatus): string {
   if (status.running) {
     return `Daemon status: running${status.pid ? ` (pid ${status.pid})` : ""}.`;
   }
-  return "Daemon status: not running. Use `schedule_daemon_start` (or `grok daemon`) to run recurring schedules.";
+  return "Daemon status: not running. Use `schedule_daemon_start` (or `crow daemon`) to run recurring schedules.";
 }

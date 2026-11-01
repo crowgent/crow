@@ -1,5 +1,5 @@
 import { generateText, type ModelMessage } from "ai";
-import { resolveModelRuntime, type XaiProvider } from "../grok/client";
+import { resolveModelRuntime, type XaiProvider } from "../crow/client";
 import { containsEncryptedReasoning } from "./reasoning";
 
 export interface CompactionSettings {

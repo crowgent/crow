@@ -1,6 +1,6 @@
 ---
 description: Guidelines for the agent system and tool implementations
-globs: "src/agent/**/*.ts,src/tools/**/*.ts,src/grok/**/*.ts"
+globs: "src/agent/**/*.ts,src/tools/**/*.ts,src/crow/**/*.ts"
 alwaysApply: false
 ---
 
@@ -10,7 +10,7 @@ alwaysApply: false
 
 `Agent` (in `src/agent/agent.ts`) is the core orchestrator. It manages:
 
-- The Grok API client (`GrokClient`)
+- The Grok API client (`CrowClient`)
 - Bash tool for all shell operations
 - Web search and X search via the Responses API
 - Chat history and message accumulation
@@ -45,18 +45,18 @@ Tools should never throw — wrap errors in `{ success: false, error: "..." }`.
 | Tool | File | Purpose |
 |------|------|---------|
 | `BashTool` | `src/tools/bash.ts` | Execute any shell command |
-| `search_web` | via `GrokClient.searchWeb()` | Web search using Responses API |
-| `search_x` | via `GrokClient.searchX()` | X/Twitter search using Responses API |
+| `search_web` | via `CrowClient.searchWeb()` | Web search using Responses API |
+| `search_x` | via `CrowClient.searchX()` | X/Twitter search using Responses API |
 
-## Grok Client
+## Crow Client
 
-`GrokClient` (in `src/grok/client.ts`) handles two API endpoints:
+`CrowClient` (in `src/crow/client.ts`) handles two API endpoints:
 
 - **Chat Completions** (`/v1/chat/completions`): Main agent loop with streaming and tool calling
 - **Responses API** (`/v1/responses`): X Search and Web Search with server-side tools
 
 ## Adding a New Tool
 
-1. Add the tool schema to `src/grok/tools.ts` (in the `TOOLS` array).
+1. Add the tool schema to `src/crow/tools.ts` (in the `TOOLS` array).
 2. Add the execution case in `Agent.executeTool()`.
 3. Update the system prompt in `Agent` to document the tool.

@@ -13,8 +13,8 @@ async function importAgentModuleWithRecapMocks() {
     },
   }));
 
-  vi.doMock("../grok/client", async () => {
-    const actual = await vi.importActual<typeof import("../grok/client")>("../grok/client");
+  vi.doMock("../crow/client", async () => {
+    const actual = await vi.importActual<typeof import("../crow/client")>("../crow/client");
     return {
       ...actual,
       generateRecap,
@@ -68,7 +68,7 @@ async function importAgentModuleWithRecapMocks() {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.resetModules();
-  vi.doUnmock("../grok/client");
+  vi.doUnmock("../crow/client");
   vi.doUnmock("../storage/index");
 });
 

@@ -1,5 +1,5 @@
 import { generateText } from "ai";
-import { resolveModelRuntime, type XaiProvider } from "../grok/client.js";
+import { resolveModelRuntime, type XaiProvider } from "../crow/client.js";
 
 export interface SideQuestionResult {
   response: string;

@@ -36,7 +36,7 @@ afterEach(() => {
 
 describe("discoverSkills", () => {
   it("discovers project skills from parent directories up to the git root", () => {
-    const repoRoot = makeTempDir("grok-skills-root-");
+    const repoRoot = makeTempDir("crow-skills-root-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
     const nested = path.join(repoRoot, "tmp", "app");
     fs.mkdirSync(nested, { recursive: true });
@@ -49,7 +49,7 @@ describe("discoverSkills", () => {
   });
 
   it("lets nearer project skills override parent project skills", () => {
-    const repoRoot = makeTempDir("grok-skills-override-");
+    const repoRoot = makeTempDir("crow-skills-override-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
     const nested = path.join(repoRoot, "tmp", "app");
     fs.mkdirSync(nested, { recursive: true });
@@ -62,7 +62,7 @@ describe("discoverSkills", () => {
   });
 
   it("folds > descriptions with spaces, not newlines", () => {
-    const repoRoot = makeTempDir("grok-skills-folded-");
+    const repoRoot = makeTempDir("crow-skills-folded-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
     writeRawSkill(
       repoRoot,
@@ -75,7 +75,7 @@ describe("discoverSkills", () => {
   });
 
   it("keeps literal | descriptions on separate lines", () => {
-    const repoRoot = makeTempDir("grok-skills-literal-");
+    const repoRoot = makeTempDir("crow-skills-literal-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
     writeRawSkill(
       repoRoot,
@@ -88,9 +88,9 @@ describe("discoverSkills", () => {
   });
 
   it("discovers symlinked skill directories", () => {
-    const repoRoot = makeTempDir("grok-skills-link-");
+    const repoRoot = makeTempDir("crow-skills-link-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
-    const external = makeTempDir("grok-skills-ext-");
+    const external = makeTempDir("crow-skills-ext-");
     fs.writeFileSync(
       path.join(external, "SKILL.md"),
       "---\nname: extlinked\ndescription: External linked skill\n---\n\n# ext\n",
@@ -105,7 +105,7 @@ describe("discoverSkills", () => {
   });
 
   it("does not drop SKILL.md files without frontmatter", () => {
-    const repoRoot = makeTempDir("grok-skills-nofm-");
+    const repoRoot = makeTempDir("crow-skills-nofm-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
     writeRawSkill(repoRoot, "plain-skill", "# Plain Skill\n\nDoes plain stuff.\n");
 
@@ -115,7 +115,7 @@ describe("discoverSkills", () => {
   });
 
   it("falls back to the directory name when frontmatter has no name", () => {
-    const repoRoot = makeTempDir("grok-skills-noname-");
+    const repoRoot = makeTempDir("crow-skills-noname-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
     writeRawSkill(repoRoot, "dir-named", "---\ndescription: Only a description\n---\n\n# body\n");
 
@@ -124,7 +124,7 @@ describe("discoverSkills", () => {
   });
 
   it("unescapes quoted values and strips unquoted inline comments", () => {
-    const repoRoot = makeTempDir("grok-skills-quotes-");
+    const repoRoot = makeTempDir("crow-skills-quotes-");
     fs.mkdirSync(path.join(repoRoot, ".git"));
     writeRawSkill(
       repoRoot,

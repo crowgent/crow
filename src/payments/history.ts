@@ -5,7 +5,7 @@ import type { PaymentAuditRecord } from "./types";
 
 export class PaymentHistory {
   static getLogPath(): string {
-    return path.join(os.homedir(), ".grok", "payment_log.jsonl");
+    return path.join(os.homedir(), ".crow", "payment_log.jsonl");
   }
 
   record(entry: PaymentAuditRecord): void {

@@ -154,7 +154,7 @@ describe("schedule daemon tools", () => {
       {
         agent: "verify-manifest",
         description: "Create verify manifest",
-        prompt: "Inspect the repository and write .grok/environment.json.",
+        prompt: "Inspect the repository and write .crow/environment.json.",
       },
       { abortSignal: undefined },
     )) as { success: boolean; output: string };
@@ -163,7 +163,7 @@ describe("schedule daemon tools", () => {
       {
         agent: "verify-manifest",
         description: "Create verify manifest",
-        prompt: "Inspect the repository and write .grok/environment.json.",
+        prompt: "Inspect the repository and write .crow/environment.json.",
       },
       undefined,
     );

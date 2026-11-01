@@ -50,8 +50,8 @@ describe("workspace trust settings", () => {
   });
 
   it("stores sandbox decisions by canonical workspace path", () => {
-    const homeDir = createTempDir("grok-trust-home-");
-    const workspace = createTempDir("grok-trust-workspace-");
+    const homeDir = createTempDir("crow-trust-home-");
+    const workspace = createTempDir("crow-trust-workspace-");
     const trustPath = getWorkspaceTrustPath(homeDir);
 
     saveWorkspaceTrustDecision(workspace, "shuru", trustPath);
@@ -62,9 +62,9 @@ describe("workspace trust settings", () => {
   });
 
   it("preserves existing entries when saving another workspace", () => {
-    const homeDir = createTempDir("grok-trust-home-");
-    const firstWorkspace = createTempDir("grok-trust-first-");
-    const secondWorkspace = createTempDir("grok-trust-second-");
+    const homeDir = createTempDir("crow-trust-home-");
+    const firstWorkspace = createTempDir("crow-trust-first-");
+    const secondWorkspace = createTempDir("crow-trust-second-");
     const trustPath = getWorkspaceTrustPath(homeDir);
 
     saveWorkspaceTrustDecision(firstWorkspace, "shuru", trustPath);
@@ -75,8 +75,8 @@ describe("workspace trust settings", () => {
   });
 
   it("ignores malformed files and entries", () => {
-    const homeDir = createTempDir("grok-trust-home-");
-    const workspace = createTempDir("grok-trust-workspace-");
+    const homeDir = createTempDir("crow-trust-home-");
+    const workspace = createTempDir("crow-trust-workspace-");
     const trustPath = getWorkspaceTrustPath(homeDir);
     fs.mkdirSync(path.dirname(trustPath), { recursive: true });
     fs.writeFileSync(
@@ -89,7 +89,7 @@ describe("workspace trust settings", () => {
     );
 
     expect(getWorkspaceTrustDecision(workspace, trustPath)).toBeNull();
-    expect(loadWorkspaceTrustStore(path.join(homeDir, ".grok", "broken.json"))).toEqual({
+    expect(loadWorkspaceTrustStore(path.join(homeDir, ".crow", "broken.json"))).toEqual({
       version: 1,
       workspaces: {},
     });

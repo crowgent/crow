@@ -4,7 +4,7 @@
 
 ### Overview
 
-Grok CLI (`@vibe-kit/grok-cli`) is a single-package TypeScript CLI tool — no databases, Docker, or background services. See `README.md` for full documentation and usage.
+Crow is a single-package TypeScript CLI tool — no databases, Docker, or background services.
 
 ### Quick reference
 

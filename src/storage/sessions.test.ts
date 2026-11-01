@@ -14,8 +14,8 @@ describe("SessionStore recap persistence", () => {
 
   beforeEach(() => {
     fs.mkdirSync(tempRoot, { recursive: true });
-    tempHome = fs.mkdtempSync(path.join(tempRoot, "grok-session-home-"));
-    tempCwd = fs.mkdtempSync(path.join(tempRoot, "grok-session-cwd-"));
+    tempHome = fs.mkdtempSync(path.join(tempRoot, "crow-session-home-"));
+    tempCwd = fs.mkdtempSync(path.join(tempRoot, "crow-session-cwd-"));
     process.env.HOME = tempHome;
     vi.spyOn(os, "homedir").mockReturnValue(tempHome);
     closeDatabase();
