@@ -3772,7 +3772,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
 function SessionHeader({
   t,
-  modeInfo,
   sessionTitle,
   sessionId,
 }: {
@@ -3785,15 +3784,9 @@ function SessionHeader({
     <box flexShrink={0} width="100%">
       <box flexDirection="row" width="100%" paddingTop={1} paddingBottom={1} paddingLeft={2} paddingRight={2}>
         <text>
-          <span style={{ fg: modeInfo.color }}>
-            <b>{modeInfo.label}</b>
-          </span>
           {sessionTitle ? (
             <span style={{ fg: t.text }}>
-              <b>
-                {": "}
-                {sessionTitle}
-              </b>
+              <b>{sessionTitle}</b>
             </span>
           ) : null}
         </text>
