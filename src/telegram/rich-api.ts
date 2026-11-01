@@ -13,8 +13,9 @@ async function callBotApi(
   token: string,
   method: string,
   body: Record<string, unknown>,
+  apiRoot = "https://api.telegram.org",
 ): Promise<TelegramBotMessage | boolean> {
-  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+  const response = await fetch(`${apiRoot}/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -36,13 +37,19 @@ export async function sendRichMessageDraft(
   target: RichMessageTarget,
   draftId: number,
   markdown: string,
+  apiRoot?: string,
 ): Promise<void> {
-  await callBotApi(token, "sendRichMessageDraft", {
-    chat_id: target.chatId,
-    message_thread_id: target.messageThreadId,
-    draft_id: draftId,
-    rich_message: { markdown },
-  });
+  await callBotApi(
+    token,
+    "sendRichMessageDraft",
+    {
+      chat_id: target.chatId,
+      message_thread_id: target.messageThreadId,
+      draft_id: draftId,
+      rich_message: { markdown },
+    },
+    apiRoot,
+  );
 }
 
 export async function sendRichMessage(
@@ -50,6 +57,7 @@ export async function sendRichMessage(
   target: RichMessageTarget,
   markdown: string,
   ephemeralReceiverUserId?: number,
+  apiRoot?: string,
 ): Promise<TelegramBotMessage> {
   const body: Record<string, unknown> = {
     chat_id: target.chatId,
@@ -59,7 +67,7 @@ export async function sendRichMessage(
   if (ephemeralReceiverUserId !== undefined) {
     body.ephemeral_message_parameters = { receiver_user_id: ephemeralReceiverUserId };
   }
-  const result = await callBotApi(token, "sendRichMessage", body);
+  const result = await callBotApi(token, "sendRichMessage", body, apiRoot);
   return result as TelegramBotMessage;
 }
 
@@ -68,13 +76,19 @@ export async function sendEphemeralText(
   target: RichMessageTarget,
   receiverUserId: number,
   text: string,
+  apiRoot?: string,
 ): Promise<TelegramBotMessage> {
-  const result = await callBotApi(token, "sendMessage", {
-    chat_id: target.chatId,
-    message_thread_id: target.messageThreadId,
-    text,
-    ephemeral_message_parameters: { receiver_user_id: receiverUserId },
-  });
+  const result = await callBotApi(
+    token,
+    "sendMessage",
+    {
+      chat_id: target.chatId,
+      message_thread_id: target.messageThreadId,
+      text,
+      ephemeral_message_parameters: { receiver_user_id: receiverUserId },
+    },
+    apiRoot,
+  );
   return result as TelegramBotMessage;
 }
 
@@ -84,11 +98,17 @@ export async function editEphemeralMessageText(
   receiverUserId: number,
   ephemeralMessageId: number,
   markdown: string,
+  apiRoot?: string,
 ): Promise<void> {
-  await callBotApi(token, "editEphemeralMessageText", {
-    chat_id: chatId,
-    receiver_user_id: receiverUserId,
-    ephemeral_message_id: ephemeralMessageId,
-    rich_message: { markdown },
-  });
+  await callBotApi(
+    token,
+    "editEphemeralMessageText",
+    {
+      chat_id: chatId,
+      receiver_user_id: receiverUserId,
+      ephemeral_message_id: ephemeralMessageId,
+      rich_message: { markdown },
+    },
+    apiRoot,
+  );
 }

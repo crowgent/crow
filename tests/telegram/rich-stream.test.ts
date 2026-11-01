@@ -101,6 +101,27 @@ describe("runTelegramRichDraftReply", () => {
     expect(reply).toHaveBeenCalledTimes(9);
     expect(calls().some((call) => call.method === "sendRichMessage")).toBe(false);
   });
+  it("reports a draft preview failure once but still persists the final message", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("sendRichMessageDraft")) {
+        return { json: async () => ({ ok: false, description: "Bad Request: draft rejected" }) };
+      }
+      return okResult({ message_id: 5 });
+    });
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const onPreviewError = vi.fn();
+    await runTelegramRichDraftReply({
+      ...baseArgs,
+      draftId: 99,
+      stream: contentStream(["a".repeat(60), "b".repeat(60)]),
+      reply,
+      onPreviewError,
+    });
+    expect(onPreviewError).toHaveBeenCalledTimes(1);
+    expect(onPreviewError).toHaveBeenCalledWith("Bad Request: draft rejected");
+    expect(calls().at(-1)?.method).toBe("sendRichMessage");
+    expect(reply).not.toHaveBeenCalled();
+  });
 });
 
 describe("runTelegramEphemeralReply", () => {
@@ -144,5 +165,26 @@ describe("runTelegramEphemeralReply", () => {
     });
     const richSends = calls().filter((call) => call.method === "sendRichMessage");
     expect(richSends.length).toBe(2);
+  });
+
+  it("falls back to a plain visible reply when ephemeral delivery fails entirely", async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("sendRichMessage")) {
+        return { json: async () => ({ ok: false, description: "Bad Request: ephemeral unavailable" }) };
+      }
+      return okResult(true);
+    });
+    const reply = vi.fn().mockResolvedValue(undefined);
+    const onPreviewError = vi.fn();
+    await runTelegramEphemeralReply({
+      ...baseArgs,
+      receiverUserId: 77,
+      stream: contentStream(["hello"]),
+      reply,
+      onPreviewError,
+    });
+    expect(reply).toHaveBeenCalledWith("hello");
+    expect(onPreviewError).toHaveBeenCalledTimes(1);
+    expect(onPreviewError).toHaveBeenCalledWith("Bad Request: ephemeral unavailable");
   });
 });

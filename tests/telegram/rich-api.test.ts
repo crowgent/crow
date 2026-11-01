@@ -82,6 +82,12 @@ describe("rich-api", () => {
     });
   });
 
+  it("uses a custom api root when given", async () => {
+    okResult({ message_id: 5 });
+    await sendRichMessage("tok", { chatId: 11 }, "hello", undefined, "http://127.0.0.1:9");
+    expect(lastUrl()).toBe("http://127.0.0.1:9/bottok/sendRichMessage");
+  });
+
   it("throws the api description on failure", async () => {
     fetchMock.mockResolvedValue({ json: async () => ({ ok: false, description: "Bad Request: bad markdown" }) });
     await expect(sendRichMessage("tok", { chatId: 11 }, "hi")).rejects.toThrow("Bad Request: bad markdown");

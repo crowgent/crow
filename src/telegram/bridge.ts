@@ -15,6 +15,7 @@ export { splitTelegramMessage, TELEGRAM_MAX_MESSAGE } from "./limits";
 
 export interface TelegramBridgeOptions {
   token: string;
+  apiRoot?: string;
   getApprovedUserIds: () => number[];
   coordinator: TurnCoordinator;
   getTelegramAgent: (userId: number) => Agent;
@@ -32,7 +33,7 @@ export interface TelegramBridgeHandle {
 }
 
 export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridgeHandle {
-  const bot = new Bot(opts.token);
+  const bot = new Bot(opts.token, opts.apiRoot ? { client: { apiRoot: opts.apiRoot } } : undefined);
   let running = false;
 
   const buildTurnKey = (ctx: { chat: { id: number }; message: { message_id: number } }) =>
@@ -143,6 +144,8 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
                 opts.token,
                 { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
                 trimmed,
+                undefined,
+                opts.apiRoot,
               );
               return;
             } catch {}
@@ -155,6 +158,7 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
                   { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
                   trimmed,
                   userId,
+                  opts.apiRoot,
                 );
               } else {
                 for (const part of splitTelegramMessage(trimmed, TELEGRAM_RICH_MAX_MESSAGE)) {
@@ -163,18 +167,26 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
                     { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
                     part,
                     userId,
+                    opts.apiRoot,
                   );
                 }
               }
               return;
             } catch {
-              for (const part of splitTelegramMessage(trimmed)) {
-                await sendEphemeralText(
-                  opts.token,
-                  { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
-                  userId,
-                  part,
-                );
+              try {
+                for (const part of splitTelegramMessage(trimmed)) {
+                  await sendEphemeralText(
+                    opts.token,
+                    { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
+                    userId,
+                    part,
+                    opts.apiRoot,
+                  );
+                }
+              } catch {
+                for (const part of splitTelegramMessage(trimmed)) {
+                  await ctx.reply(part);
+                }
               }
               return;
             }
@@ -186,13 +198,13 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
           return;
         }
 
-        const richStreamArgs = {
+        const richStreamBase = {
           api: bot.api,
           token: opts.token,
+          apiRoot: opts.apiRoot,
           chatId: ctx.chat.id,
           messageThreadId: ctx.message.message_thread_id,
           typingIndicator: stream.typingIndicator,
-          stream: agent.processMessage(promptText),
           reply: (text: string) => ctx.reply(text),
           onAssistantMessage: (event: { content: string; done: boolean }) => {
             opts.onAssistantMessage?.({
@@ -213,13 +225,24 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
               toolResult: event.toolResult,
             });
           },
+          onPreviewError: (message: string) => {
+            opts.onError?.(`telegram_preview: ${message}`);
+          },
         };
         const isGroup = ctx.chat.type === "group" || ctx.chat.type === "supergroup";
         const isPrivate = ctx.chat.type === "private";
         if (isPrivate) {
-          await runTelegramRichDraftReply({ ...richStreamArgs, draftId: ctx.message.message_id });
+          await runTelegramRichDraftReply({
+            ...richStreamBase,
+            draftId: ctx.message.message_id,
+            stream: agent.processMessage(promptText),
+          });
         } else if (isGroup) {
-          await runTelegramEphemeralReply({ ...richStreamArgs, receiverUserId: userId });
+          await runTelegramEphemeralReply({
+            ...richStreamBase,
+            receiverUserId: userId,
+            stream: agent.processMessage(promptText),
+          });
         } else {
           await runTelegramPartialReply(bot.api, {
             chatId: ctx.chat.id,

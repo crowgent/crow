@@ -14,11 +14,13 @@ export interface TelegramRichStreamCallbacks {
     toolCall: NonNullable<StreamChunk["toolCall"]>;
     toolResult: NonNullable<StreamChunk["toolResult"]>;
   }) => void;
+  onPreviewError?: (message: string) => void;
 }
 
 export interface TelegramRichStreamArgs extends TelegramRichStreamCallbacks {
   api: Api;
   token: string;
+  apiRoot?: string;
   chatId: number | string;
   messageThreadId?: number;
   typingIndicator: boolean;
@@ -36,6 +38,7 @@ async function runStream(
   let lastPreviewAt = 0;
   let lastPreviewLen = 0;
   let previewBroken = false;
+  let previewErrorReported = false;
   const maybePreview = async (force: boolean) => {
     if (previewBroken) return;
     const now = Date.now();
@@ -45,8 +48,12 @@ async function runStream(
       await preview(acc.slice(0, TELEGRAM_RICH_MAX_MESSAGE));
       lastPreviewAt = Date.now();
       lastPreviewLen = acc.length;
-    } catch {
+    } catch (err) {
       previewBroken = true;
+      if (!previewErrorReported) {
+        previewErrorReported = true;
+        args.onPreviewError?.(err instanceof Error ? err.message : String(err));
+      }
     }
   };
   try {
@@ -87,15 +94,21 @@ async function runStream(
 
 export async function runTelegramRichDraftReply(args: TelegramRichStreamArgs & { draftId: number }): Promise<void> {
   const target = { chatId: args.chatId, messageThreadId: args.messageThreadId };
+  let previewErrorReported = false;
   const preview = async (text: string) => {
     try {
-      await sendRichMessageDraft(args.token, target, args.draftId, text);
-    } catch {}
+      await sendRichMessageDraft(args.token, target, args.draftId, text, args.apiRoot);
+    } catch (err) {
+      if (!previewErrorReported) {
+        previewErrorReported = true;
+        args.onPreviewError?.(err instanceof Error ? err.message : String(err));
+      }
+    }
   };
   const finalize = async (text: string) => {
     if (text.length <= TELEGRAM_RICH_MAX_MESSAGE) {
       try {
-        await sendRichMessage(args.token, target, text);
+        await sendRichMessage(args.token, target, text, undefined, args.apiRoot);
         return;
       } catch {}
     }
@@ -113,28 +126,48 @@ export async function runTelegramEphemeralReply(
   let ephemeralMessageId: number | undefined;
   const preview = async (text: string) => {
     if (ephemeralMessageId === undefined) {
-      const sent = await sendRichMessage(args.token, target, text, args.receiverUserId);
+      const sent = await sendRichMessage(args.token, target, text, args.receiverUserId, args.apiRoot);
       if (sent.ephemeral_message_id === undefined) {
         throw new Error("Ephemeral message id missing");
       }
       ephemeralMessageId = sent.ephemeral_message_id;
       return;
     }
-    await editEphemeralMessageText(args.token, args.chatId, args.receiverUserId, ephemeralMessageId, text);
+    await editEphemeralMessageText(
+      args.token,
+      args.chatId,
+      args.receiverUserId,
+      ephemeralMessageId,
+      text,
+      args.apiRoot,
+    );
   };
   const finalize = async (text: string, previewBroken: boolean) => {
     if (!previewBroken && ephemeralMessageId !== undefined) {
       try {
-        await editEphemeralMessageText(args.token, args.chatId, args.receiverUserId, ephemeralMessageId, text);
+        await editEphemeralMessageText(
+          args.token,
+          args.chatId,
+          args.receiverUserId,
+          ephemeralMessageId,
+          text,
+          args.apiRoot,
+        );
         return;
       } catch {}
     }
-    if (text.length <= TELEGRAM_RICH_MAX_MESSAGE) {
-      await sendRichMessage(args.token, target, text, args.receiverUserId);
-      return;
-    }
-    for (const part of splitTelegramMessage(text, TELEGRAM_RICH_MAX_MESSAGE)) {
-      await sendRichMessage(args.token, target, part, args.receiverUserId);
+    try {
+      if (text.length <= TELEGRAM_RICH_MAX_MESSAGE) {
+        await sendRichMessage(args.token, target, text, args.receiverUserId, args.apiRoot);
+        return;
+      }
+      for (const part of splitTelegramMessage(text, TELEGRAM_RICH_MAX_MESSAGE)) {
+        await sendRichMessage(args.token, target, part, args.receiverUserId, args.apiRoot);
+      }
+    } catch {
+      for (const part of splitTelegramMessage(text)) {
+        await args.reply(part);
+      }
     }
   };
   await runStream(args, preview, finalize);
