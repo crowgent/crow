@@ -58,6 +58,7 @@ export const PROVIDER_API_KEY_ENVS: ProviderApiKeyEnv[] = [
   { providerId: "baseten", envVars: ["BASETEN_API_KEY"] },
   { providerId: "digitalocean", envVars: ["DIGITALOCEAN_ACCESS_TOKEN"] },
   { providerId: "302ai", envVars: ["302AI_API_KEY"] },
+  { providerId: "xai", envVars: ["XAI_API_KEY"] },
   { providerId: "abacus", envVars: ["ABACUS_API_KEY"] },
   { providerId: "abliteration-ai", envVars: ["ABLIT_KEY"] },
   { providerId: "above", envVars: ["ABOVE_API_KEY"] },
@@ -10815,6 +10816,20 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
       { id: "glm-5.3-highspeed", name: "GLM-5.3 Highspeed", contextWindow: 1000000, reasoning: true },
     ],
   },
+  {
+    id: "xai",
+    name: "xAI",
+    baseUrl: "https://api.x.ai/v1",
+    models: [
+      { id: "grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
+      { id: "grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
+      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
+      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
+      { id: "grok-4.20-0309-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 1000000, reasoning: true },
+      { id: "grok-4.20-0309-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 1000000 },
+      { id: "grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
+    ],
+  },
 ];
 
 export function customProviderToDefinition(custom: CustomProvider): ProviderDefinition {
@@ -10889,8 +10904,7 @@ export function parseModelsResponse(payload: unknown): string[] {
   const ids = data
     .map((entry) => (entry && typeof entry === "object" ? (entry as { id?: unknown }).id : undefined))
     .filter((id): id is string => typeof id === "string" && id.trim() !== "")
-    .map((id) => id.trim())
-    .filter((id) => !/grok/i.test(id));
+    .map((id) => id.trim());
   return [...new Set(ids)].sort();
 }
 
