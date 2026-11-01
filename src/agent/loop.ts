@@ -1,7 +1,8 @@
-import { type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai";
+import { generateText, type ModelMessage, stepCountIs, streamText, type ToolSet } from "ai";
 import { addBatchRequests, createBatch, getBatchChatCompletion, pollBatchRequestResult } from "../crow/batch";
 import { type CrowProvider, createProvider, createReasoningCapture, resolveModelRuntime } from "../crow/client";
 import type { getModelInfo } from "../crow/models";
+import { withToolOutputCap } from "../crow/tool-output-cap";
 import { toolSetToBatchTools } from "../crow/tool-schemas";
 import { createTools } from "../crow/tools";
 import type { executeEventHooks } from "../hooks/index";
@@ -67,6 +68,7 @@ import {
 import { humanizeApiError, isAuthenticationError, isContextLimitError } from "./errors";
 import { applyModelConstraints, buildSystemPrompt } from "./prompts";
 import { sanitizeModelMessages } from "./reasoning";
+import { computeRetryDelayMs, isRetryableError, MAX_MODEL_RETRIES, sleepWithSignal } from "./retry";
 import { ThoughtTracker } from "./thought";
 import { buildVisionUserMessages } from "./vision-input";
 
@@ -220,6 +222,7 @@ async function* processMessageBatchTurn(
           yield { type: "content", content: `MCP unavailable: ${mcpBundle.errors.join(" | ")}\n\n` };
         }
       }
+      tools = withToolOutputCap(tools, ctx.session?.id ?? undefined);
 
       const batchTools = runtime.modelInfo?.supportsClientTools === false ? [] : await toolSetToBatchTools(tools);
       const batch = await createBatch({
@@ -474,6 +477,7 @@ export async function* processMessage(
   const modelInfo = runtime.modelInfo;
   ctx.planContext = null;
   let attemptedOverflowRecovery = false;
+  let modelRetryAttempt = 0;
 
   if (ctx.batchApi) {
     try {
@@ -501,6 +505,10 @@ export async function* processMessage(
       let streamOk = false;
       let closeMcp: (() => Promise<void>) | undefined;
       let stepNumber = -1;
+      let lastStepFinishReason: ProcessMessageFinishReason = "other";
+      let completedSteps = 0;
+      let shouldRetry = false;
+      let retryError: unknown = null;
       const activeToolCalls: ToolCall[] = [];
 
       try {
@@ -540,6 +548,7 @@ export async function* processMessage(
             yield { type: "content", content: `MCP unavailable: ${mcpBundle.errors.join(" | ")}\n\n` };
           }
         }
+        tools = withToolOutputCap(tools, ctx.session?.id ?? undefined);
 
         thoughtTracker.start();
         const result = streamText({
@@ -563,6 +572,8 @@ export async function* processMessage(
           onStepFinish: (event: unknown) => {
             const currentStep = getStepNumber(event, Math.max(stepNumber, 0));
             stepNumber = Math.max(stepNumber, currentStep);
+            lastStepFinishReason = getFinishReason(event);
+            completedSteps += 1;
             notifyObserver(observer?.onStepFinish, {
               stepNumber: currentStep,
               timestamp: Date.now(),
@@ -646,6 +657,18 @@ export async function* processMessage(
             }
 
             case "error": {
+              if (
+                !signal.aborted &&
+                assistantText.trim() === "" &&
+                activeToolCalls.length === 0 &&
+                !thoughtTracker.hasReasoning() &&
+                modelRetryAttempt < MAX_MODEL_RETRIES &&
+                isRetryableError(part.error)
+              ) {
+                shouldRetry = true;
+                retryError = part.error;
+                break;
+              }
               const authError = isAuthenticationError(part.error);
               const friendly = humanizeApiError(part.error);
               notifyObserver(observer?.onError, {
@@ -664,6 +687,7 @@ export async function* processMessage(
               yield { type: "content", content: "\n\n[Cancelled]" };
               break;
           }
+          if (shouldRetry) break;
         }
 
         if (signal.aborted) {
@@ -672,18 +696,75 @@ export async function* processMessage(
           return;
         }
 
+        if (shouldRetry) {
+          const delayMs = computeRetryDelayMs(modelRetryAttempt, retryError);
+          modelRetryAttempt += 1;
+          yield {
+            type: "content",
+            content: `\n\n[${humanizeApiError(retryError)} Retrying in ${Math.ceil(delayMs / 1000)}s…]`,
+          };
+          thoughtTracker.reset();
+          await sleepWithSignal(delayMs, signal);
+          continue;
+        }
+
         await reasoningCapture.settled();
         const thought = thoughtTracker.finish();
         try {
           const response = await result.response;
           if (!signal.aborted) {
-            appendCompletedTurn(ctx, userModelMessage, sanitizeModelMessages(response.messages), thought);
+            let savedMessages = sanitizeModelMessages(response.messages);
+            if (completedSteps >= ctx.maxToolRounds && isToolCallsFinish(lastStepFinishReason)) {
+              try {
+                const summary = await generateText({
+                  model: runtime.model,
+                  system:
+                    "Summarize what was accomplished in this turn, what remains unfinished, and the immediate next step. Be concise. Do not call any tools.",
+                  messages: [...ctx.messages, ...savedMessages],
+                  ...(runtime.modelInfo?.supportsMaxOutputTokens === false ? {} : { maxOutputTokens: ctx.maxTokens }),
+                  ...(runtime.providerOptions ? { providerOptions: runtime.providerOptions } : {}),
+                  abortSignal: signal,
+                });
+                const summaryText = summary.text.trim();
+                if (summaryText && !signal.aborted) {
+                  yield { type: "content", content: summaryText };
+                  savedMessages = [...savedMessages, { role: "assistant", content: summaryText }];
+                  ctx.recordUsage(
+                    {
+                      inputTokens: summary.usage.inputTokens,
+                      outputTokens: summary.usage.outputTokens,
+                      totalTokens: summary.usage.totalTokens,
+                    },
+                    "message",
+                    runtime.modelId,
+                  );
+                }
+              } catch {}
+            }
+            appendCompletedTurn(ctx, userModelMessage, savedMessages, thought);
             await ctx.refreshSessionRecap(signal);
             streamOk = true;
           }
         } catch (responseError: unknown) {
           if (!attemptedOverflowRecovery && !assistantText.trim() && modelInfo && isContextLimitError(responseError)) {
             attemptedOverflowRecovery = true;
+            continue;
+          }
+          if (
+            !assistantText.trim() &&
+            activeToolCalls.length === 0 &&
+            !thoughtTracker.hasReasoning() &&
+            modelRetryAttempt < MAX_MODEL_RETRIES &&
+            isRetryableError(responseError)
+          ) {
+            const delayMs = computeRetryDelayMs(modelRetryAttempt, responseError);
+            modelRetryAttempt += 1;
+            yield {
+              type: "content",
+              content: `\n\n[${humanizeApiError(responseError)} Retrying in ${Math.ceil(delayMs / 1000)}s…]`,
+            };
+            thoughtTracker.reset();
+            await sleepWithSignal(delayMs, signal);
             continue;
           }
         }
@@ -718,6 +799,24 @@ export async function* processMessage(
 
         if (!attemptedOverflowRecovery && !assistantText.trim() && modelInfo && isContextLimitError(err)) {
           attemptedOverflowRecovery = true;
+          continue;
+        }
+
+        if (
+          !assistantText.trim() &&
+          activeToolCalls.length === 0 &&
+          !thoughtTracker.hasReasoning() &&
+          modelRetryAttempt < MAX_MODEL_RETRIES &&
+          isRetryableError(err)
+        ) {
+          const delayMs = computeRetryDelayMs(modelRetryAttempt, err);
+          modelRetryAttempt += 1;
+          yield {
+            type: "content",
+            content: `\n\n[${humanizeApiError(err)} Retrying in ${Math.ceil(delayMs / 1000)}s…]`,
+          };
+          thoughtTracker.reset();
+          await sleepWithSignal(delayMs, signal);
           continue;
         }
 
@@ -802,6 +901,10 @@ function getFinishReason(event: unknown): ProcessMessageFinishReason {
   }
 
   return "other";
+}
+
+function isToolCallsFinish(reason: ProcessMessageFinishReason): boolean {
+  return reason === "tool-calls";
 }
 
 function getUsage(event: unknown): ProcessMessageUsage {

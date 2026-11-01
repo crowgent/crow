@@ -13,6 +13,19 @@ export class ThoughtTracker {
     this.capturedReasoning += text;
   }
 
+  hasReasoning(): boolean {
+    return this.capturedReasoning.length > 0;
+  }
+
+  reset(): void {
+    this.capturedReasoning = "";
+    this.emitted = 0;
+    this.preview = "";
+    this.encryptedHidden = false;
+    this.startMs = 0;
+    this.doneMs = null;
+  }
+
   start(): void {
     if (this.startMs === 0) {
       this.startMs = Date.now();
