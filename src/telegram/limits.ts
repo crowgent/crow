@@ -1,4 +1,3 @@
-/** Telegram text message hard limit (characters). */
 export const TELEGRAM_MAX_MESSAGE = 4096;
 
 export function splitTelegramMessage(text: string): string[] {

@@ -5,6 +5,8 @@ import { loadUserSettings, resolveTelegramStreamSettings } from "../utils/settin
 import { splitTelegramMessage, TELEGRAM_MAX_MESSAGE } from "./limits";
 import { registerPairingCode } from "./pairing";
 import { runTelegramPartialReply } from "./preview-stream";
+import { sendEphemeralText, sendRichMessage } from "./rich-api";
+import { runTelegramEphemeralReply, runTelegramRichDraftReply } from "./rich-stream";
 import { sendFileToTelegram } from "./send-file";
 import type { TurnCoordinator } from "./turn-coordinator";
 import { startTypingRefresh } from "./typing-refresh";
@@ -63,14 +65,12 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
     });
     try {
       await ctx.reply(`Error: ${clipped}`);
-    } catch {
-      /* user blocked bot or chat forbids messages */
-    }
+    } catch {}
   };
 
   const runAgentTurn = async (
     ctx: {
-      chat: { id: number };
+      chat: { id: number; type?: string };
       from?: { id?: number };
       message: { message_id: number; message_thread_id?: number };
       reply: (text: string) => Promise<unknown>;
@@ -135,6 +135,50 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
           }
           const trimmed = acc.trim() || "(no text output)";
           opts.onAssistantMessage?.({ turnKey, userId, content: trimmed, done: true });
+          const isGroup = ctx.chat.type === "group" || ctx.chat.type === "supergroup";
+          const isPrivate = ctx.chat.type === "private";
+          if (isPrivate && trimmed.length <= TELEGRAM_MAX_MESSAGE) {
+            try {
+              await sendRichMessage(
+                opts.token,
+                { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
+                trimmed,
+              );
+              return;
+            } catch {}
+          }
+          if (isGroup) {
+            try {
+              if (trimmed.length <= TELEGRAM_MAX_MESSAGE) {
+                await sendRichMessage(
+                  opts.token,
+                  { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
+                  trimmed,
+                  userId,
+                );
+              } else {
+                for (const part of splitTelegramMessage(trimmed)) {
+                  await sendRichMessage(
+                    opts.token,
+                    { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
+                    part,
+                    userId,
+                  );
+                }
+              }
+              return;
+            } catch {
+              for (const part of splitTelegramMessage(trimmed)) {
+                await sendEphemeralText(
+                  opts.token,
+                  { chatId: ctx.chat.id, messageThreadId: ctx.message.message_thread_id },
+                  userId,
+                  part,
+                );
+              }
+              return;
+            }
+          }
           const parts = splitTelegramMessage(trimmed);
           for (const part of parts) {
             await ctx.reply(part);
@@ -142,12 +186,15 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
           return;
         }
 
-        await runTelegramPartialReply(bot.api, {
+        const richStreamArgs = {
+          api: bot.api,
+          token: opts.token,
           chatId: ctx.chat.id,
           messageThreadId: ctx.message.message_thread_id,
           typingIndicator: stream.typingIndicator,
           stream: agent.processMessage(promptText),
-          onAssistantMessage: (event) => {
+          reply: (text: string) => ctx.reply(text),
+          onAssistantMessage: (event: { content: string; done: boolean }) => {
             opts.onAssistantMessage?.({
               turnKey,
               userId,
@@ -155,10 +202,10 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
               done: event.done,
             });
           },
-          onToolCalls: (toolCalls) => {
+          onToolCalls: (toolCalls: ToolCall[]) => {
             opts.onToolCalls?.({ turnKey, userId, toolCalls });
           },
-          onToolResult: (event) => {
+          onToolResult: (event: { toolCall: ToolCall; toolResult: ToolResult }) => {
             opts.onToolResult?.({
               turnKey,
               userId,
@@ -166,7 +213,40 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
               toolResult: event.toolResult,
             });
           },
-        });
+        };
+        const isGroup = ctx.chat.type === "group" || ctx.chat.type === "supergroup";
+        const isPrivate = ctx.chat.type === "private";
+        if (isPrivate) {
+          await runTelegramRichDraftReply({ ...richStreamArgs, draftId: ctx.message.message_id });
+        } else if (isGroup) {
+          await runTelegramEphemeralReply({ ...richStreamArgs, receiverUserId: userId });
+        } else {
+          await runTelegramPartialReply(bot.api, {
+            chatId: ctx.chat.id,
+            messageThreadId: ctx.message.message_thread_id,
+            typingIndicator: stream.typingIndicator,
+            stream: agent.processMessage(promptText),
+            onAssistantMessage: (event) => {
+              opts.onAssistantMessage?.({
+                turnKey,
+                userId,
+                content: event.content,
+                done: event.done,
+              });
+            },
+            onToolCalls: (toolCalls) => {
+              opts.onToolCalls?.({ turnKey, userId, toolCalls });
+            },
+            onToolResult: (event) => {
+              opts.onToolResult?.({
+                turnKey,
+                userId,
+                toolCall: event.toolCall,
+                toolResult: event.toolResult,
+              });
+            },
+          });
+        }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         await replyTurnError(ctx, userId, msg);

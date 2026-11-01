@@ -8,7 +8,6 @@ const EDIT_THROTTLE_MS = 350;
 const EDIT_MIN_CHARS = 48;
 const MAX_API_RETRIES = 12;
 
-/** Bot API allows `message_thread_id` for forum topics; @grammyjs/types may omit it on `editMessageText`. */
 function editThreadOpts(messageThreadId?: number): { message_thread_id?: number } {
   return messageThreadId !== undefined ? { message_thread_id: messageThreadId } : {};
 }
@@ -31,7 +30,6 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   throw lastErr;
 }
 
-/** Same text as before — not an error; avoid treating as preview failure. */
 function isMessageNotModified(err: unknown): boolean {
   return (
     err instanceof GrammyError &&
@@ -41,7 +39,6 @@ function isMessageNotModified(err: unknown): boolean {
   );
 }
 
-/** Telegram requires non-empty text; use zero-width space so nothing visible appears before real tokens. */
 const EMPTY_PREVIEW_PLACEHOLDER = "\u200b";
 
 function previewBody(acc: string): string {
@@ -62,10 +59,6 @@ export interface TelegramPartialReplyArgs {
   }) => void;
 }
 
-/**
- * Sends a live-updating preview (send + throttled editMessageText), then finalizes.
- * Falls back to buffer-then-send if the initial message cannot be sent.
- */
 export async function runTelegramPartialReply(api: Api, args: TelegramPartialReplyArgs): Promise<void> {
   const { chatId, messageThreadId, typingIndicator, stream, onAssistantMessage, onToolCalls, onToolResult } = args;
 
@@ -78,14 +71,12 @@ export async function runTelegramPartialReply(api: Api, args: TelegramPartialRep
   };
 
   let previewMessageId: number | undefined;
-  /** First sendMessage failed — finish with sendParts only. */
   let previewCreateFailed = false;
   let acc = "";
   let previewBroken = false;
   let lastEditAt = 0;
   let lastEditLen = 0;
 
-  /** First real message is sent only after assistant text exists so sendChatAction(typing) stays visible until then. */
   const ensurePreviewMessage = async () => {
     if (previewMessageId !== undefined || previewCreateFailed || !acc) return;
     try {

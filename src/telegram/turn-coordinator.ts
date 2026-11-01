@@ -1,6 +1,3 @@
-/**
- * Serialize async turns (local TUI + Telegram) so only one Agent.processMessage runs at a time.
- */
 export function createTurnCoordinator() {
   let chain: Promise<unknown> = Promise.resolve();
 

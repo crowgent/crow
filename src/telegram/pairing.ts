@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto";
 
 const PAIRING_TTL_MS = 60 * 60 * 1000;
 
-/** code (uppercase) -> { userId, expiresAt } */
 const pendingByCode = new Map<string, { userId: number; expiresAt: number }>();
 
 function generateCode(): string {
