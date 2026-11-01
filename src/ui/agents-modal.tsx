@@ -1,28 +1,37 @@
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { type RefObject, useEffect, useRef } from "react";
 import { MODELS } from "../crow/models";
-import type { CustomSubagentConfig } from "../utils/settings";
+import type { AgentDefinition } from "../utils/agent-files";
 import { formatSubagentName } from "../utils/subagent-display";
 import type { Theme } from "./theme";
 
 const EDITOR_KEYBINDINGS = [{ name: "return", action: "submit" as const }];
 
-export type SubagentBrowseRow = { kind: "agent"; agent: CustomSubagentConfig };
+export type AgentFleetRow = { kind: "fleet"; definition: AgentDefinition };
 export const SUBAGENT_EDITOR_FIELDS = ["name", "model", "instruction"] as const;
 export type SubagentEditorField = (typeof SUBAGENT_EDITOR_FIELDS)[number];
 
-export function buildSubagentBrowseRows(agents: CustomSubagentConfig[], query: string): SubagentBrowseRow[] {
+export function sourceBadge(source: AgentDefinition["source"]): string {
+  if (source === "project") return "Project";
+  if (source === "global") return "Global";
+  if (source === "settings") return "Settings";
+  return "Built-in";
+}
+
+export function buildAgentFleetRows(definitions: AgentDefinition[], query: string): AgentFleetRow[] {
   const q = query.trim().toLowerCase();
   const filtered = q
-    ? agents.filter(
-        (agent) =>
-          agent.name.toLowerCase().includes(q) ||
-          agent.model.toLowerCase().includes(q) ||
-          agent.instruction.toLowerCase().includes(q),
+    ? definitions.filter(
+        (definition) =>
+          definition.name.toLowerCase().includes(q) ||
+          definition.description.toLowerCase().includes(q) ||
+          definition.model.toLowerCase().includes(q),
       )
-    : agents;
+    : definitions;
 
-  return filtered.map((agent) => ({ kind: "agent" as const, agent }));
+  return [...filtered]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((definition) => ({ kind: "fleet" as const, definition }));
 }
 
 function bottomAlignedModalTop(height: number, panelHeight: number): number {
@@ -49,7 +58,7 @@ export function SubagentsBrowserModal({
   height: number;
   selectedIndex: number;
   searchQuery: string;
-  rows: SubagentBrowseRow[];
+  rows: AgentFleetRow[];
 }) {
   const listRef = useRef<ScrollBoxRenderable>(null);
 
@@ -57,7 +66,7 @@ export function SubagentsBrowserModal({
     const selected = rows[selectedIndex];
     if (!selected) return;
 
-    listRef.current?.scrollChildIntoView(`subagent-${selected.agent.name}`);
+    listRef.current?.scrollChildIntoView(`subagent-${selected.definition.name}`);
   }, [rows, selectedIndex]);
 
   const itemCount = Math.max(rows.length, 1);
@@ -87,49 +96,60 @@ export function SubagentsBrowserModal({
       >
         <box flexShrink={0} flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2}>
           <text fg={t.primary}>
-            <b>{"Custom sub-agents"}</b>
+            <b>{"Sub-agents"}</b>
           </text>
           <text fg={t.textMuted}>{"esc"}</text>
         </box>
         <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
           <text fg={t.text}>
-            {searchQuery || <span style={{ fg: t.textMuted }}>{"Search by name, model..."}</span>}
+            {searchQuery || <span style={{ fg: t.textMuted }}>{"Search by name, description..."}</span>}
           </text>
         </box>
         <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
           {rows.map((row, idx) => {
             const selected = idx === selectedIndex;
+            const definition = row.definition;
 
             return (
               <box
-                key={`agent-${row.agent.name}`}
-                id={`subagent-${row.agent.name}`}
+                key={`agent-${definition.name}`}
+                id={`subagent-${definition.name}`}
                 width="100%"
                 backgroundColor={selected ? t.selectedBg : undefined}
                 paddingLeft={2}
                 paddingRight={2}
               >
                 <box width="100%" flexDirection="row" justifyContent="space-between">
-                  <text fg={selected ? t.primary : t.text}>
-                    <b>{formatSubagentName(row.agent.name)}</b>
+                  <text fg={definition.enabled ? (selected ? t.primary : t.text) : t.textMuted}>
+                    <b>{formatSubagentName(definition.name)}</b>
+                    {!definition.enabled ? " (disabled)" : ""}
                   </text>
-                  <text fg={t.textMuted}>{row.agent.model}</text>
+                  <text fg={t.textMuted}>
+                    {sourceBadge(definition.source)} · {definition.model}
+                  </text>
                 </box>
+                {definition.description ? (
+                  <box width="100%">
+                    <text fg={t.textMuted}>{definition.description}</text>
+                  </box>
+                ) : null}
               </box>
             );
           })}
           {rows.length === 0 ? (
             <box paddingLeft={2} paddingRight={2}>
-              <text fg={t.textMuted}>{"No custom sub-agents yet"}</text>
+              <text fg={t.textMuted}>{"No sub-agents yet"}</text>
             </box>
           ) : null}
         </scrollbox>
         <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={2} paddingBottom={1}>
           <text>
             <span style={{ fg: t.primary }}>{"enter "}</span>
-            <span style={{ fg: t.textMuted }}>{"open selected · "}</span>
+            <span style={{ fg: t.textMuted }}>{"edit · "}</span>
             <span style={{ fg: t.primary }}>{"ctrl+a "}</span>
-            <span style={{ fg: t.textMuted }}>{"add"}</span>
+            <span style={{ fg: t.textMuted }}>{"add · "}</span>
+            <span style={{ fg: t.primary }}>{"ctrl+x "}</span>
+            <span style={{ fg: t.textMuted }}>{"remove / disable"}</span>
           </text>
         </box>
       </box>

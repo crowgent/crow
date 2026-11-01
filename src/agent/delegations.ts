@@ -4,7 +4,7 @@ import { promises as fs } from "fs";
 import os from "os";
 import path from "path";
 import type { DelegationRun, DelegationStatus, TaskRequest, ToolResult } from "../types/index";
-import type { SandboxMode, SandboxSettings } from "../utils/settings";
+import { loadUserSettings, type SandboxMode, type SandboxSettings } from "../utils/settings";
 
 const ID_ADJECTIVES = ["brisk", "calm", "clever", "eager", "gentle", "keen", "lively", "nimble", "quiet", "steady"];
 
@@ -65,6 +65,22 @@ export class DelegationManager {
         success: false,
         output:
           "Background delegations are read-only. Use `delegate` with the `explore` agent, or use `task` for foreground work that may edit files.",
+      };
+    }
+
+    const rawMaxConcurrent = loadUserSettings().subagents?.maxConcurrent;
+    const maxConcurrent =
+      typeof rawMaxConcurrent === "number" && Number.isFinite(rawMaxConcurrent) && rawMaxConcurrent > 0
+        ? rawMaxConcurrent
+        : 10;
+    const capDir = await ensureDelegationsDir(this.getCwd());
+    const capFiles = await readDelegationFiles(capDir);
+    const capRecords = await Promise.all(capFiles.map((file) => readRecord(path.join(capDir, file))));
+    const runningCount = capRecords.filter((record) => record?.status === "running").length;
+    if (runningCount >= maxConcurrent) {
+      return {
+        success: false,
+        output: `Background delegation limit reached (${runningCount}/${maxConcurrent} running). Wait for one to finish, or raise subagents.maxConcurrent in ~/.crow/user-settings.json.`,
       };
     }
 

@@ -79,6 +79,12 @@ export interface McpSettings {
   servers?: McpServerConfig[];
 }
 
+export interface SubagentSettings {
+  maxConcurrent?: number;
+  defaultMaxTurns?: number;
+  maxDepth?: number;
+}
+
 export interface CustomSubagentConfig {
   name: string;
   model: string;
@@ -146,6 +152,7 @@ export interface UserSettings {
   telegram?: TelegramSettings;
   mcp?: McpSettings;
   subAgents?: CustomSubagentConfig[];
+  subagents?: SubagentSettings;
   hooks?: HooksConfig;
   modeModels?: Partial<Record<AgentMode, string>>;
 }
@@ -281,6 +288,14 @@ export function saveUserSettings(partial: Partial<UserSettings>): void {
             ...agent,
             model: normalizeModelId(agent.model),
           })),
+        }
+      : {}),
+    ...(partial.subagents !== undefined
+      ? {
+          subagents: {
+            ...current.subagents,
+            ...partial.subagents,
+          },
         }
       : {}),
     ...(partial.sandbox !== undefined

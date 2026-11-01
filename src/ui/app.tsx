@@ -33,6 +33,15 @@ import type {
   ToolResult,
 } from "../types/index";
 import { MODES } from "../types/index";
+import {
+  type AgentDefinition,
+  type AgentFileInput,
+  deleteAgentFile,
+  disableBuiltinAgent,
+  findAgentDefinition,
+  loadAgentDefinitions,
+  writeAgentFile,
+} from "../utils/agent-files";
 import { processAtMentions } from "../utils/at-mentions.js";
 import { FileIndex } from "../utils/file-index.js";
 import { copyTextToHostClipboard } from "../utils/host-clipboard";
@@ -46,6 +55,7 @@ import {
 } from "../utils/providers";
 import {
   type CustomSubagentConfig,
+  getCurrentModel,
   getProviderApiKey,
   getSelectedProvider,
   getTelegramBotToken,
@@ -72,7 +82,7 @@ import { formatSubagentName } from "../utils/subagent-display";
 import { checkForUpdate, runUpdate, type UpdateCheckResult } from "../utils/update-checker";
 import { buildVerifyPrompt } from "../verify/entrypoint";
 import {
-  buildSubagentBrowseRows,
+  buildAgentFleetRows,
   SUBAGENT_EDITOR_FIELDS,
   type SubagentEditorField,
   SubagentEditorModal,
@@ -360,6 +370,7 @@ function formatRecapsEnabled(enabled: boolean): (typeof RECAP_OPTIONS)[number] {
 function parseCustomSubagentSlashCommand(
   cmd: string,
   subagents: CustomSubagentConfig[],
+  definitions: AgentDefinition[],
 ): { agentName: string; prompt: string } | null {
   const trimmed = cmd.trim();
   if (!trimmed.startsWith("/")) return null;
@@ -373,21 +384,25 @@ function parseCustomSubagentSlashCommand(
   }
 
   const lowerBody = body.toLowerCase();
-  const sortedSubagents = [...subagents].sort((a, b) => b.name.length - a.name.length);
-  const match = sortedSubagents.find((item) => {
-    const lowerName = item.name.trim().toLowerCase();
+  const names = [
+    ...subagents.map((item) => item.name),
+    ...definitions.filter((item) => item.enabled && item.mode !== "primary").map((item) => item.name),
+  ];
+  const sortedNames = [...new Set(names)].sort((a, b) => b.length - a.length);
+  const match = sortedNames.find((name) => {
+    const lowerName = name.trim().toLowerCase();
     return lowerBody === lowerName || lowerBody.startsWith(`${lowerName} `);
   });
   if (!match) return null;
 
   return {
-    agentName: match.name,
-    prompt: body.slice(match.name.length).trim(),
+    agentName: match,
+    prompt: body.slice(match.length).trim(),
   };
 }
 
 function buildCustomSubagentSlashPrompt(agentName: string, prompt: string): string {
-  return `Use the custom sub-agent "${agentName}" for this task.
+  return `Use the sub-agent "${agentName}" for this task.
 
 Delegate the work with the \`task\` tool using:
 - \`agent\`: "${agentName}"
@@ -587,6 +602,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [showAgentsModal, setShowAgentsModal] = useState(false);
   const [showAgentsEditor, setShowAgentsEditor] = useState(false);
   const [subAgents, setSubAgents] = useState<CustomSubagentConfig[]>(() => loadValidSubAgents());
+  const [agentDefinitions, setAgentDefinitions] = useState<AgentDefinition[]>(() =>
+    loadAgentDefinitions(process.cwd()),
+  );
+  const [editingFile, setEditingFile] = useState<{
+    definition: AgentDefinition | null;
+    scope: "project" | "global";
+    originalModel: string;
+  } | null>(null);
+  const [directSubagent, setDirectSubagent] = useState<SubagentStatus | null>(null);
   const [agentsSearchQuery, setAgentsSearchQuery] = useState("");
   const [agentsModalIndex, setAgentsModalIndex] = useState(0);
   const [editingSubagent, setEditingSubagent] = useState<CustomSubagentConfig | null>(null);
@@ -718,8 +742,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const mcpRows = buildMcpBrowseRows(mcpServers, mcpSearchQuery);
   const mcpEditorFields = mcpEditorDraft.transport === "stdio" ? MCP_STDIO_FIELDS : MCP_REMOTE_FIELDS;
   const agentRows = useMemo(
-    () => buildSubagentBrowseRows(subAgents, agentsSearchQuery),
-    [subAgents, agentsSearchQuery],
+    () => buildAgentFleetRows(agentDefinitions, agentsSearchQuery),
+    [agentDefinitions, agentsSearchQuery],
   );
   const scheduleRows = useMemo(
     () => buildScheduleBrowseRows(schedules, scheduleSearchQuery),
@@ -901,9 +925,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
   const openAgentsModal = useCallback(() => {
     setSubAgents(loadValidSubAgents());
+    setAgentDefinitions(loadAgentDefinitions(process.cwd()));
     setAgentsSearchQuery("");
     setAgentsModalIndex(0);
     setEditingSubagent(null);
+    setEditingFile(null);
     setAgentsEditorError(null);
     setShowAgentsEditor(false);
     setShowAgentsModal(true);
@@ -999,7 +1025,108 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     setShowAgentsModal(true);
   }, []);
 
+  const openFleetEditor = useCallback(
+    (definition: AgentDefinition | null) => {
+      setEditingSubagent(null);
+      if (!definition) {
+        setEditingFile({ definition: null, scope: "project", originalModel: "inherit" });
+        setAgentsEditorDraft({ name: "", instruction: "" });
+        setAgentsEditorModelIndex(
+          Math.max(
+            0,
+            MODELS.findIndex((model) => model.id === DEFAULT_MODEL),
+          ),
+        );
+      } else if (definition.source === "settings") {
+        setEditingFile(null);
+        openSubagentEditor({
+          name: definition.name,
+          model: definition.model === "inherit" ? getCurrentModel() : definition.model,
+          instruction: definition.body,
+        });
+        return;
+      } else {
+        const scope = definition.source === "project" ? "project" : "global";
+        setEditingFile({
+          definition,
+          scope: definition.source === "builtin" ? "project" : scope,
+          originalModel: definition.model,
+        });
+        setAgentsEditorDraft({ name: definition.name, instruction: definition.body });
+        const modelId = definition.model === "inherit" ? getCurrentModel() : definition.model;
+        setAgentsEditorModelIndex(
+          Math.max(
+            0,
+            MODELS.findIndex((model) => model.id === normalizeModelId(modelId)),
+          ),
+        );
+      }
+      setAgentsEditorField("name");
+      setAgentsEditorError(null);
+      setAgentsEditorSyncKey((n) => n + 1);
+      setShowAgentsEditor(true);
+      setShowAgentsModal(true);
+    },
+    [openSubagentEditor],
+  );
+
   const submitSubagentEditor = useCallback(() => {
+    if (editingFile) {
+      const name = (subagentNameRef.current?.plainText || "").trim();
+      const instruction = subagentInstructionRef.current?.plainText || "";
+      const model = MODELS[agentsEditorModelIndex]?.id;
+
+      if (!name) {
+        setAgentsEditorError("Name is required.");
+        return;
+      }
+      if (!model || !getModelIds().includes(model)) {
+        setAgentsEditorError("Pick a valid model.");
+        return;
+      }
+      const clash = agentDefinitions.find(
+        (item) =>
+          item.name.toLowerCase() === name.toLowerCase() &&
+          item.name.toLowerCase() !== (editingFile.definition?.name.toLowerCase() ?? ""),
+      );
+      if (clash) {
+        setAgentsEditorError(`Another sub-agent already uses this name (${clash.source}).`);
+        return;
+      }
+
+      const cwd = process.cwd();
+      const resolvedModel =
+        editingFile.originalModel === "inherit" && normalizeModelId(model) === normalizeModelId(getCurrentModel())
+          ? "inherit"
+          : model;
+      const input: AgentFileInput = {
+        description: editingFile.definition?.description ?? "",
+        model: resolvedModel,
+        tools: editingFile.definition?.tools ?? null,
+        maxTurns: editingFile.definition?.maxTurns ?? null,
+        color: editingFile.definition?.color ?? null,
+        hidden: editingFile.definition?.hidden ?? false,
+        enabled: true,
+        mode: editingFile.definition?.mode ?? "subagent",
+        promptMode: editingFile.definition?.promptMode ?? "replace",
+        body: instruction,
+      };
+      if (
+        editingFile.definition &&
+        editingFile.definition.source !== "builtin" &&
+        editingFile.definition.name.toLowerCase() !== name.toLowerCase()
+      ) {
+        deleteAgentFile(editingFile.scope, cwd, editingFile.definition.name);
+      }
+      writeAgentFile(editingFile.scope, cwd, name, input);
+      setAgentDefinitions(loadAgentDefinitions(cwd));
+      setShowAgentsEditor(false);
+      setEditingFile(null);
+      setAgentsEditorError(null);
+      setAgentsModalIndex(0);
+      return;
+    }
+
     const name = (subagentNameRef.current?.plainText || "").trim();
     const instruction = subagentInstructionRef.current?.plainText || "";
     const model = MODELS[agentsEditorModelIndex]?.id;
@@ -1034,9 +1161,26 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     setShowAgentsEditor(false);
     setEditingSubagent(null);
     setAgentsEditorError(null);
-  }, [agentsEditorModelIndex, editingSubagent, subAgents]);
+  }, [agentDefinitions, agentsEditorModelIndex, editingFile, editingSubagent, subAgents]);
 
   const removeEditingSubagent = useCallback(() => {
+    if (editingFile) {
+      const cwd = process.cwd();
+      const definition = editingFile.definition;
+      if (definition) {
+        if (definition.source === "builtin") {
+          disableBuiltinAgent("global", cwd, definition.name);
+        } else {
+          deleteAgentFile(editingFile.scope, cwd, definition.name);
+        }
+      }
+      setAgentDefinitions(loadAgentDefinitions(cwd));
+      setShowAgentsEditor(false);
+      setEditingFile(null);
+      setAgentsEditorError(null);
+      setAgentsModalIndex(0);
+      return;
+    }
     if (!editingSubagent) return;
 
     const next = subAgents.filter((item) => item.name !== editingSubagent.name);
@@ -1046,7 +1190,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     setEditingSubagent(null);
     setAgentsEditorError(null);
     setAgentsModalIndex(0);
-  }, [editingSubagent, subAgents]);
+  }, [editingFile, editingSubagent, subAgents]);
 
   const submitMcpEditor = useCallback(() => {
     const draft: McpEditorDraft = {
@@ -2360,7 +2504,62 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           });
         return true;
       }
-      const customSubagentCommand = parseCustomSubagentSlashCommand(cmd, subAgents);
+      const assignMatch = /^\/agents\s+assign\s+(\S+)(?:\s+([\s\S]+))?$/.exec(cmd.trim());
+      if (assignMatch) {
+        const assignName = assignMatch[1] ?? "";
+        const assignTask = (assignMatch[2] ?? "").trim();
+        if (!assignName || !assignTask) {
+          setMessages((prev) => [...prev, buildAssistantEntry("Usage: /agents assign <name> <task>")]);
+          return true;
+        }
+        const definition = findAgentDefinition(agentDefinitions, assignName);
+        const custom = !definition
+          ? subAgents.find((item) => item.name.toLowerCase() === assignName.toLowerCase())
+          : undefined;
+        if (definition && (!definition.enabled || definition.mode === "primary")) {
+          setMessages((prev) => [
+            ...prev,
+            buildAssistantEntry(`Sub-agent "${assignName}" cannot be assigned directly.`),
+          ]);
+          return true;
+        }
+        if (!definition && !custom) {
+          setMessages((prev) => [
+            ...prev,
+            buildAssistantEntry(`Unknown sub-agent "${assignName}". Open /agents to see available sub-agents.`),
+          ]);
+          return true;
+        }
+        const description = assignTask.length > 80 ? `${assignTask.slice(0, 77)}...` : assignTask;
+        void (async () => {
+          setDirectSubagent({ agent: assignName, description, detail: "Starting" });
+          try {
+            const result = await agent.runTaskRequest(
+              { agent: assignName, description, prompt: assignTask },
+              (detail) => {
+                setDirectSubagent((prev) => (prev ? { ...prev, detail } : prev));
+              },
+            );
+            setMessages((prev) => [
+              ...prev,
+              buildAssistantEntry(
+                result.success
+                  ? result.task?.summary || result.output || "Sub-agent finished."
+                  : result.output || "Sub-agent failed.",
+              ),
+            ]);
+          } catch (error) {
+            setMessages((prev) => [
+              ...prev,
+              buildAssistantEntry(`Sub-agent task failed: ${error instanceof Error ? error.message : String(error)}`),
+            ]);
+          } finally {
+            setDirectSubagent(null);
+          }
+        })();
+        return true;
+      }
+      const customSubagentCommand = parseCustomSubagentSlashCommand(cmd, subAgents, agentDefinitions);
       if (customSubagentCommand) {
         if (!customSubagentCommand.prompt) {
           setMessages((prev) => [
@@ -2379,6 +2578,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     },
     [
       agent,
+      agentDefinitions,
       handleExit,
       openAgentsModal,
       openMcpModal,
@@ -2753,7 +2953,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           setAgentsEditorError(null);
           return;
         }
-        if (key.name === "x" && key.ctrl && editingSubagent) {
+        if (key.name === "x" && key.ctrl && (editingSubagent || editingFile)) {
           removeEditingSubagent();
           return;
         }
@@ -2893,13 +3093,13 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           return;
         }
         if (key.name === "return") {
-          if (row?.kind === "agent") {
-            openSubagentEditor(row.agent);
+          if (row?.kind === "fleet") {
+            openFleetEditor(row.definition);
           }
           return;
         }
         if (key.name === "a" && key.ctrl) {
-          openSubagentEditor(null);
+          openFleetEditor(null);
           return;
         }
         if (key.name === "backspace") {
@@ -3345,7 +3545,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       openProviderConnect,
       openMcpEditor,
       replacePasteBlocks,
-      openSubagentEditor,
+      openFleetEditor,
+      editingFile,
       removeSchedule,
       scheduleModalIndex,
       scheduleRows,
@@ -3523,6 +3724,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 ),
               )}
               {activeSubagent && <SubagentActivity t={t} status={activeSubagent} />}
+              {directSubagent && <SubagentActivity t={t} status={directSubagent} />}
               {/* Streaming assistant content */}
               {streamContent && (
                 <box paddingLeft={3} marginTop={1} flexShrink={0}>
@@ -3734,11 +3936,21 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           focusedField={agentsEditorField}
           modelIndex={agentsEditorModelIndex}
           error={agentsEditorError}
-          title={editingSubagent ? `Edit sub-agent: ${formatSubagentName(editingSubagent.name)}` : "Add sub-agent"}
+          title={
+            editingFile
+              ? editingFile.definition
+                ? editingFile.definition.source === "builtin"
+                  ? `Override built-in: ${formatSubagentName(editingFile.definition.name)} (project)`
+                  : `Edit sub-agent: ${formatSubagentName(editingFile.definition.name)}`
+                : "Add sub-agent (project)"
+              : editingSubagent
+                ? `Edit sub-agent: ${formatSubagentName(editingSubagent.name)}`
+                : "Add sub-agent"
+          }
           nameRef={subagentNameRef}
           instructionRef={subagentInstructionRef}
           onSubmit={submitSubagentEditor}
-          showRemoveHint={!!editingSubagent}
+          showRemoveHint={!!(editingSubagent || editingFile)}
         />
       )}
       {showModelPicker && (

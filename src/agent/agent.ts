@@ -71,6 +71,12 @@ import type {
   VerifyRecipe,
   WorkspaceInfo,
 } from "../types/index";
+import {
+  type AgentDefinition,
+  builtinAgentDefinitions,
+  findAgentDefinition,
+  loadAgentDefinitions,
+} from "../utils/agent-files";
 import { loadCustomInstructions } from "../utils/instructions";
 import {
   type CustomSubagentConfig,
@@ -78,6 +84,7 @@ import {
   getModeSpecificModel,
   loadMcpServers,
   loadRecapsEnabled,
+  loadUserSettings,
   loadValidSubAgents,
   type SandboxMode,
   type SandboxSettings,
@@ -334,13 +341,14 @@ function buildSystemPrompt(
   const skillsText = formatSkillsForPrompt(discoverSkills(cwd));
   const skillsSection = skillsText ? `\n\n${skillsText}\n` : "";
   const subagentsSection = formatCustomSubagentsPromptSection(subagents ?? loadValidSubAgents());
+  const definitionsSection = formatAgentDefinitionsPromptSection(loadAgentDefinitions(cwd));
   const sandboxSection = formatSandboxPromptSection(sandboxMode, sandboxSettings);
 
   const planSection = planContext
     ? `\n\nAPPROVED PLAN:\nThe following plan has been approved by the user. Execute it now.\n${planContext}\n`
     : "";
 
-  return `${MODE_PROMPTS[mode]}${sandboxSection}${customSection}${skillsSection}${subagentsSection}${planSection}
+  return `${MODE_PROMPTS[mode]}${sandboxSection}${customSection}${skillsSection}${subagentsSection}${definitionsSection}${planSection}
 
 Current working directory: ${cwd}`;
 }
@@ -474,6 +482,44 @@ function buildSubagentPrompt(
     "",
     buildSystemPrompt(cwd, mode, sandboxMode, undefined, subagents, sandboxSettings),
   ].join("\n");
+}
+
+function buildFileAgentPrompt(
+  request: TaskRequest,
+  cwd: string,
+  definition: AgentDefinition,
+  childMode: AgentMode,
+  sandboxMode: SandboxMode,
+  subagents: CustomSubagentConfig[],
+  sandboxSettings: SandboxSettings | undefined,
+  builtinBaseBody: string | null,
+  legacyPrompt: string | null,
+): string {
+  if (definition.promptMode === "append" && legacyPrompt && !builtinBaseBody) {
+    return `${legacyPrompt}\n\nADDITIONAL INSTRUCTIONS:\n${definition.body}`;
+  }
+  const head =
+    definition.promptMode === "append" && builtinBaseBody
+      ? `${builtinBaseBody}\n\n${definition.body}`
+      : definition.body;
+  return [
+    head,
+    "",
+    "You are helping a parent agent. Do not address the end user directly.",
+    "Focus tightly on the delegated scope and summarize what matters back to the parent agent.",
+    "",
+    `Delegated task: ${request.description}`,
+    "",
+    buildSystemPrompt(cwd, childMode, sandboxMode, undefined, subagents, sandboxSettings),
+  ].join("\n");
+}
+
+function formatAgentDefinitionsPromptSection(definitions: AgentDefinition[]): string {
+  const lines = definitions
+    .filter((definition) => definition.enabled && !definition.hidden && definition.description)
+    .map((definition) => `- ${definition.name}: ${definition.description}`);
+  if (lines.length === 0) return "";
+  return `\n\nSUB-AGENTS:\nMarkdown-defined and built-in sub-agents. When one matches the task, call the task tool with agent set to the exact name.\n\n${lines.join("\n")}\n`;
 }
 
 function formatSandboxPromptSection(sandboxMode: SandboxMode, settings?: SandboxSettings): string {
@@ -1190,10 +1236,39 @@ export class Agent {
     const isVerifyManifest = agentKey === "verify-manifest";
     const isComputer = agentKey === "computer";
     const subagents = loadValidSubAgents();
+    const definitions = loadAgentDefinitions(this.bash.getCwd());
+    const definition = findAgentDefinition(definitions, agentKey);
+    const fileDefinition = definition && definition.source !== "settings" ? definition : undefined;
     const custom =
       !isExplore && !isGeneral && !isVision && !isVerify && !isVerifyDetect && !isVerifyManifest && !isComputer
         ? findCustomSubagent(agentKey, subagents)
         : undefined;
+
+    if (definition && !definition.enabled) {
+      const message = `Sub-agent "${agentKey}" is disabled.`;
+      return {
+        success: false,
+        output: message,
+        task: {
+          agent: agentKey,
+          description: request.description,
+          summary: message,
+        },
+      };
+    }
+
+    if (definition && definition.mode === "primary") {
+      const message = `Sub-agent "${agentKey}" is a primary-session agent and cannot be delegated work.`;
+      return {
+        success: false,
+        output: message,
+        task: {
+          agent: agentKey,
+          description: request.description,
+          summary: message,
+        },
+      };
+    }
 
     if (
       !isExplore &&
@@ -1203,9 +1278,10 @@ export class Agent {
       !isVerifyDetect &&
       !isVerifyManifest &&
       !isComputer &&
-      !custom
+      !custom &&
+      !fileDefinition
     ) {
-      const message = `Unknown sub-agent "${agentKey}". Use general, explore, vision, verify, verify-detect, verify-manifest, computer, or a configured name from ~/.crow/user-settings.json.`;
+      const message = `Unknown sub-agent "${agentKey}". Use general, explore, vision, verify, verify-detect, verify-manifest, computer, a configured name from ~/.crow/user-settings.json, or a Markdown agent from .crow/agents.`;
       return {
         success: false,
         output: message,
@@ -1239,7 +1315,19 @@ export class Agent {
         ? (verifyPreparedSettings ?? { ...this.bash.getSandboxSettings(), ...verifySandboxOverrides })
         : this.bash.getSandboxSettings(),
     });
-    const childModelId = normalizeModelId(custom ? custom.model : this.modelId);
+    const childModelId = normalizeModelId(
+      fileDefinition && fileDefinition.model !== "inherit"
+        ? fileDefinition.model
+        : custom
+          ? custom.model
+          : this.modelId,
+    );
+    const settingsDefaultMaxTurns = (() => {
+      const value = loadUserSettings().subagents?.defaultMaxTurns;
+      return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+    })();
+    const turnCap = fileDefinition?.maxTurns ?? settingsDefaultMaxTurns ?? Number.POSITIVE_INFINITY;
+    const maxChildSteps = Math.min(this.maxToolRounds, isExplore ? 60 : 120, turnCap);
     const childBaseTools = createTools(childBash, provider, childMode, {
       modelId: childModelId,
       providerId: this.providerId ?? undefined,
@@ -1272,15 +1360,40 @@ export class Agent {
         },
       };
     }
+    const builtinBaseBody =
+      builtinAgentDefinitions().find((item) => item.name.toLowerCase() === agentKey.toLowerCase())?.body ?? null;
+    const legacyPrompt =
+      fileDefinition && fileDefinition.promptMode === "append" && !builtinBaseBody
+        ? buildSubagentPrompt(
+            request,
+            childBash.getCwd(),
+            null,
+            childBash.getSandboxMode(),
+            subagents,
+            childBash.getSandboxSettings(),
+          )
+        : null;
     const childSystem = applyModelConstraints(
-      buildSubagentPrompt(
-        request,
-        childBash.getCwd(),
-        custom ?? null,
-        childBash.getSandboxMode(),
-        subagents,
-        childBash.getSandboxSettings(),
-      ),
+      fileDefinition
+        ? buildFileAgentPrompt(
+            request,
+            childBash.getCwd(),
+            fileDefinition,
+            childMode,
+            childBash.getSandboxMode(),
+            subagents,
+            childBash.getSandboxSettings(),
+            builtinBaseBody,
+            legacyPrompt,
+          )
+        : buildSubagentPrompt(
+            request,
+            childBash.getCwd(),
+            custom ?? null,
+            childBash.getSandboxMode(),
+            subagents,
+            childBash.getSandboxSettings(),
+          ),
       childRuntime.modelId,
     );
 
@@ -1295,6 +1408,11 @@ export class Agent {
           lastActivity = `MCP unavailable: ${mcpBundle.errors.join(" | ")}`;
           onActivity?.(lastActivity);
         }
+      }
+
+      if (fileDefinition?.tools) {
+        const allowedTools = new Set(fileDefinition.tools);
+        childTools = Object.fromEntries(Object.entries(childTools).filter(([toolName]) => allowedTools.has(toolName)));
       }
 
       const childPrompt =
@@ -1313,7 +1431,7 @@ export class Agent {
           childSystem,
           childRuntime,
           childTools,
-          maxSteps: Math.min(this.maxToolRounds, isExplore ? 60 : 120),
+          maxSteps: maxChildSteps,
           initialDetail,
           onActivity,
           signal,
@@ -1325,7 +1443,7 @@ export class Agent {
         system: childSystem,
         messages: childMessages,
         tools: childRuntime.modelInfo?.supportsClientTools === false ? {} : childTools,
-        stopWhen: stepCountIs(Math.min(this.maxToolRounds, isExplore ? 60 : 120)),
+        stopWhen: stepCountIs(maxChildSteps),
         maxRetries: 0,
         abortSignal: signal,
         temperature: isExplore ? 0.2 : 0.5,
@@ -1618,6 +1736,7 @@ export class Agent {
           listDelegations: () => this.listDelegations(),
           scheduleManager: this.schedules,
           subagents,
+          agentDefinitions: loadAgentDefinitions(this.bash.getCwd()),
           sendTelegramFile: this.sendTelegramFile ?? undefined,
           sessionId: this.session?.id ?? undefined,
         });
@@ -1948,6 +2067,7 @@ export class Agent {
             listDelegations: () => this.listDelegations(),
             scheduleManager: this.schedules,
             subagents,
+            agentDefinitions: loadAgentDefinitions(this.bash.getCwd()),
             sendTelegramFile: this.sendTelegramFile ?? undefined,
             sessionId: this.session?.id ?? undefined,
           });

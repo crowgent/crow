@@ -22,6 +22,7 @@ import { editFile, readFile, writeFile } from "../tools/file";
 import { executeGrep } from "../tools/grep";
 import type { ScheduleDaemonStatus, ScheduleManager, StoredSchedule } from "../tools/schedule";
 import type { AgentMode, TaskRequest, ToolResult } from "../types/index";
+import { type AgentDefinition, delegatableAgentNames, isDelegatable } from "../utils/agent-files";
 import { type CustomSubagentConfig, loadValidSubAgents } from "../utils/settings";
 import type { CrowProvider } from "./client";
 
@@ -34,6 +35,7 @@ interface CreateToolsOptions {
   listDelegations?: () => Promise<ToolResult>;
   scheduleManager?: ScheduleManager;
   subagents?: CustomSubagentConfig[];
+  agentDefinitions?: AgentDefinition[];
   sendTelegramFile?: (filePath: string) => Promise<ToolResult>;
   sessionId?: string;
 }
@@ -264,7 +266,10 @@ export function createTools(
   }
 
   if (options.runTask) {
+    const registryDefinitions = (options.agentDefinitions ?? []).filter(isDelegatable);
+    const registryNames = delegatableAgentNames(options.agentDefinitions ?? []);
     const customNames = (options.subagents ?? loadValidSubAgents()).map((agent) => agent.name);
+    const extraNames = [...registryNames, ...customNames].filter((name, index, list) => list.indexOf(name) === index);
     const taskAgentEnum = [
       "general",
       "explore",
@@ -273,22 +278,27 @@ export function createTools(
       "verify-detect",
       "verify-manifest",
       "computer",
-      ...customNames,
+      ...extraNames,
     ] as [string, ...string[]];
     const customHint =
       customNames.length > 0
         ? ` You may also use these user-defined sub-agents by exact name: ${customNames.join(", ")}.`
         : "";
+    const routingLines = registryDefinitions
+      .filter((definition) => definition.description)
+      .map((definition) => `- ${definition.name}: ${definition.description}`);
+    const routingHint =
+      routingLines.length > 0 ? ` Available sub-agents and when to use them:\n${routingLines.join("\n")}` : "";
 
     tools.task = tool({
-      description: `Delegate a focused foreground task to a sub-agent. Prefer this proactively for review, research, investigation, code quality work, verification, and computer-use flows instead of waiting for the user to request a sub-agent. Use \`general\` for multi-step execution, \`explore\` for fast read-only investigation, \`vision\` for image validation, \`verify\` for sandbox-aware build, test, and smoke validation, \`verify-detect\` for read-only verification recipe detection, \`verify-manifest\` to create or update a verification manifest, and \`computer\` for host desktop screenshot/input workflows.${customHint} Provide a short description plus a detailed prompt for the child agent.`,
+      description: `Delegate a focused foreground task to a sub-agent. Prefer this proactively for review, research, investigation, code quality work, verification, and computer-use flows instead of waiting for the user to request a sub-agent. Use \`general\` for multi-step execution, \`explore\` for fast read-only investigation, \`vision\` for image validation, \`verify\` for sandbox-aware build, test, and smoke validation, \`verify-detect\` for read-only verification recipe detection, \`verify-manifest\` to create or update a verification manifest, and \`computer\` for host desktop screenshot/input workflows.${customHint}${routingHint} Provide a short description plus a detailed prompt for the child agent.`,
       inputSchema: z.object({
         agent: z
           .enum(taskAgentEnum)
           .default("general")
           .describe(
-            customNames.length > 0
-              ? "Built-in general, explore, vision, verify, verify-detect, verify-manifest, or computer, or a configured custom sub-agent name from user settings"
+            extraNames.length > 0
+              ? "Built-in general, explore, vision, verify, verify-detect, verify-manifest, or computer, or a Markdown-defined or configured custom sub-agent name"
               : "Which sub-agent to use",
           ),
         description: z.string().describe("A short label for the delegated task, such as 'Deep code quality analysis'"),
