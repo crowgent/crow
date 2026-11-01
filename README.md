@@ -30,6 +30,14 @@ static marker instead of a moving spinner.
 
 - [Bun](https://bun.sh) (the working runtime for this repo)
 
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
+```
+
+This installs the latest release binary to `~/.crow/bin` and adds it to your PATH.
+
 ## Install from source
 
 ```sh
