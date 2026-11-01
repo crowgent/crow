@@ -484,6 +484,53 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     approvalId?: string;
     selected: number;
   } | null>(null);
+  const [pendingPermission, setPendingPermission] = useState<{
+    action: string;
+    resource: string;
+    toolName: string;
+    selected: number;
+  } | null>(null);
+  const permissionQueueRef = useRef<
+    Array<{
+      request: { action: string; resource: string; toolName: string };
+      resolve: (decision: "allow" | "deny") => void;
+    }>
+  >([]);
+  const permissionAnsweredAtRef = useRef(0);
+  const advancePermissionQueue = useCallback(() => {
+    const next = permissionQueueRef.current[0];
+    setPendingPermission(next ? { ...next.request, selected: 0 } : null);
+  }, []);
+  const answerPermission = useCallback(
+    (decision: "allow" | "deny", always: boolean) => {
+      const current = permissionQueueRef.current.shift();
+      if (!current) return;
+      permissionAnsweredAtRef.current = Date.now();
+      if (always && decision === "allow") {
+        agent.addPermissionRule({
+          action: current.request.action,
+          resource: current.request.resource,
+          effect: "allow",
+        });
+      }
+      current.resolve(decision);
+      advancePermissionQueue();
+    },
+    [agent, advancePermissionQueue],
+  );
+  useEffect(() => {
+    agent.setPermissionResolver((request) => {
+      return new Promise<"allow" | "deny">((resolve) => {
+        permissionQueueRef.current.push({ request, resolve });
+        if (permissionQueueRef.current.length === 1) {
+          advancePermissionQueue();
+        }
+      });
+    });
+    return () => {
+      agent.setPermissionResolver(null);
+    };
+  }, [agent, advancePermissionQueue]);
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([]);
   const [sessionTitle, setSessionTitle] = useState<string | null>(() => agent.getSessionTitle());
   const [sessionId, setSessionId] = useState<string | null>(() => agent.getSessionId());
@@ -2144,6 +2191,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
   const interruptActiveRun = useCallback(
     (key?: KeyEvent) => {
+      if (permissionQueueRef.current.length > 0 || Date.now() - permissionAnsweredAtRef.current < 1000) return false;
       if (btwStateRef.current) {
         btwAbortRef.current?.abort();
         btwAbortRef.current = null;
@@ -2689,6 +2737,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     showSandboxPicker ||
     showRecapPicker ||
     !!pendingPaymentApproval ||
+    !!pendingPermission ||
     showScheduleModal ||
     showAgentsModal ||
     showAgentsEditor ||
@@ -3271,6 +3320,29 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         return;
       }
+      if (pendingPermission) {
+        if (isEscapeKey(key)) {
+          answerPermission("deny", false);
+          return;
+        }
+        if (key.name === "up" || key.name === "down") {
+          setPendingPermission((p) =>
+            p ? { ...p, selected: wrapListIndex(p.selected, 3, key.name === "down" ? 1 : -1) } : p,
+          );
+          return;
+        }
+        if (key.name === "return") {
+          if (pendingPermission.selected === 0) {
+            answerPermission("allow", false);
+          } else if (pendingPermission.selected === 1) {
+            answerPermission("allow", true);
+          } else {
+            answerPermission("deny", false);
+          }
+          return;
+        }
+        return;
+      }
       if (pendingPaymentApproval) {
         if (isEscapeKey(key)) {
           setPendingPaymentApproval(null);
@@ -3562,6 +3634,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       showRecapPicker,
       showSandboxPicker,
       pendingPaymentApproval,
+      pendingPermission,
+      answerPermission,
       processMessage,
       showSlashMenu,
       slashMenuIndex,
@@ -3722,6 +3796,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               {/* Plan questions panel — inline, OpenCode-style */}
               {showPlanPanel && <PlanQuestionsPanel t={t} questions={planQuestions} state={pqs} />}
               {pendingPaymentApproval && <PaymentApprovalPanel t={t} payment={pendingPaymentApproval} />}
+              {pendingPermission && <PermissionApprovalPanel t={t} permission={pendingPermission} />}
             </scrollbox>
             {btwState && <BtwOverlay state={btwState} theme={t} />}
             {/* Prompt */}
@@ -5985,6 +6060,90 @@ function PaymentApprovalPanel({
         <text>
           <span style={{ fg: t.text }}>{"esc"}</span>
           <span style={{ fg: t.textMuted }}>{" reject"}</span>
+        </text>
+      </box>
+    </box>
+  );
+}
+
+function PermissionApprovalPanel({
+  t,
+  permission,
+}: {
+  t: Theme;
+  permission: {
+    action: string;
+    resource: string;
+    toolName: string;
+    selected: number;
+  };
+}) {
+  const options = ["Allow once", "Always allow", "Deny"];
+  return (
+    <box
+      flexDirection="column"
+      border={["left"]}
+      customBorderChars={{
+        topLeft: "",
+        bottomLeft: "",
+        vertical: "┃",
+        topRight: "",
+        bottomRight: "",
+        horizontal: " ",
+        bottomT: "",
+        topT: "",
+        cross: "",
+        leftT: "",
+        rightT: "",
+      }}
+      borderColor="#e5c07b"
+      marginTop={1}
+      paddingLeft={2}
+      paddingRight={2}
+      paddingTop={1}
+      paddingBottom={1}
+      backgroundColor={t.backgroundPanel}
+    >
+      <text>
+        <span style={{ fg: t.planTitle ?? t.primary }}>
+          <b>{"Permission required"}</b>
+        </span>
+      </text>
+      <box marginTop={1} flexDirection="column">
+        <text>
+          <span style={{ fg: t.textMuted }}>{"Tool: "}</span>
+          <span style={{ fg: t.text }}>{permission.toolName}</span>
+        </text>
+        {permission.resource ? (
+          <text>
+            <span style={{ fg: t.textMuted }}>{"Target: "}</span>
+            <span style={{ fg: t.text }}>{permission.resource}</span>
+          </text>
+        ) : null}
+      </box>
+      <box marginTop={1} flexDirection="column">
+        {options.map((label, i) => {
+          const isSel = i === permission.selected;
+          return (
+            <text key={label}>
+              <span style={{ fg: isSel ? "#22c55e" : t.textMuted }}>{isSel ? "> " : "  "}</span>
+              <span style={{ fg: isSel ? t.text : t.textMuted }}>{isSel ? <b>{label}</b> : label}</span>
+            </text>
+          );
+        })}
+      </box>
+      <box flexDirection="row" gap={3} marginTop={1} flexShrink={0}>
+        <text>
+          <span style={{ fg: t.text }}>{"↑↓"}</span>
+          <span style={{ fg: t.textMuted }}>{" select"}</span>
+        </text>
+        <text>
+          <span style={{ fg: t.text }}>{"enter"}</span>
+          <span style={{ fg: t.textMuted }}>{" confirm"}</span>
+        </text>
+        <text>
+          <span style={{ fg: t.text }}>{"esc"}</span>
+          <span style={{ fg: t.textMuted }}>{" deny"}</span>
         </text>
       </box>
     </box>

@@ -2,6 +2,8 @@ import { generateText, type ModelMessage, stepCountIs, streamText, type ToolSet 
 import { addBatchRequests, createBatch, getBatchChatCompletion, pollBatchRequestResult } from "../crow/batch";
 import { type CrowProvider, createProvider, createReasoningCapture, resolveModelRuntime } from "../crow/client";
 import type { getModelInfo } from "../crow/models";
+import { withPermissionGate } from "../crow/permission-gate";
+import type { PermissionEffect, PermissionResolver } from "../crow/permissions";
 import { withToolOutputCap } from "../crow/tool-output-cap";
 import { toolSetToBatchTools } from "../crow/tool-schemas";
 import { createTools } from "../crow/tools";
@@ -106,6 +108,8 @@ export interface LoopContext {
   runSubagent(request: SubagentRequest, abortSignal?: AbortSignal): Promise<ToolResult>;
   readDelegation(id: string): Promise<ToolResult>;
   listDelegations(): Promise<ToolResult>;
+  evaluatePermission(action: string, resource: string): PermissionEffect;
+  resolvePermission?: PermissionResolver;
 }
 
 function getCompactionSettings(maxTokens: number): CompactionSettings {
@@ -223,6 +227,10 @@ async function* processMessageBatchTurn(
         }
       }
       tools = withToolOutputCap(tools, ctx.session?.id ?? undefined);
+      tools = withPermissionGate(tools, {
+        evaluate: ctx.evaluatePermission,
+        resolve: ctx.resolvePermission,
+      });
 
       const batchTools = runtime.modelInfo?.supportsClientTools === false ? [] : await toolSetToBatchTools(tools);
       const batch = await createBatch({
@@ -549,6 +557,10 @@ export async function* processMessage(
           }
         }
         tools = withToolOutputCap(tools, ctx.session?.id ?? undefined);
+        tools = withPermissionGate(tools, {
+          evaluate: ctx.evaluatePermission,
+          resolve: ctx.resolvePermission,
+        });
 
         thoughtTracker.start();
         const result = streamText({

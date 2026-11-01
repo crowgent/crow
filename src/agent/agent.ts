@@ -6,6 +6,7 @@ import {
   generateTitle as genTitle,
 } from "../crow/client";
 import { normalizeModelId } from "../crow/models";
+import { type PermissionResolver, type PermissionRule, PermissionStore } from "../crow/permissions";
 import { executeEventHooks } from "../hooks/index";
 import type {
   NotificationHookInput,
@@ -147,6 +148,8 @@ export class Agent {
   private batchApi = false;
   private sessionStartHookFired = false;
   private recapsEnabled = true;
+  private permissionStore = new PermissionStore();
+  private permissionResolver: PermissionResolver | null = null;
 
   constructor(
     apiKey: string | undefined,
@@ -379,6 +382,14 @@ export class Agent {
 
   async cleanup(): Promise<void> {
     await Promise.allSettled([this.bash.cleanup(), shutdownWorkspaceLspManager(this.bash.getCwd())]);
+  }
+
+  setPermissionResolver(resolver: PermissionResolver | null): void {
+    this.permissionResolver = resolver;
+  }
+
+  addPermissionRule(rule: PermissionRule): void {
+    this.permissionStore.addRule(rule);
   }
 
   respondToToolApproval(approvalId: string, approved: boolean): void {
@@ -761,6 +772,10 @@ export class Agent {
       },
       getSessionId: () => this.getSessionId(),
       requireProvider: () => this.requireProvider(),
+      evaluatePermission: (action, resource) => agent.permissionStore.evaluate(action, resource),
+      get resolvePermission() {
+        return agent.permissionResolver ?? undefined;
+      },
       fireHook: (input, signal) => this.fireHook(input, signal),
       recordUsage: (usage, source, model) => this.recordUsage(usage, source, model),
       emitSubagentStatus: (status) => this.emitSubagentStatus(status),
