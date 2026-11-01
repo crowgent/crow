@@ -152,6 +152,30 @@ function ensureLatestSchema(db: SQLiteDatabase): void {
       created_at TEXT NOT NULL,
       PRIMARY KEY (session_id, message_seq)
     ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS turn_claims (
+      session_id TEXT PRIMARY KEY,
+      pid INTEGER NOT NULL,
+      started_at TEXT NOT NULL,
+      preview TEXT NOT NULL
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS turn_drafts (
+      session_id TEXT PRIMARY KEY,
+      text TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    ) STRICT;
+
+    CREATE TABLE IF NOT EXISTS inbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      text TEXT NOT NULL,
+      display_text TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    ) STRICT;
+
+    CREATE INDEX IF NOT EXISTS idx_inbox_session_id
+      ON inbox(session_id, id);
   `);
 }
 

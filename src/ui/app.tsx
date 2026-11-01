@@ -145,7 +145,7 @@ type ContextStats = {
 };
 type PasteBlock = { id: number; content: string; lines: number; isImage?: boolean };
 type FileMentionBlock = { id: number; path: string };
-type QueuedMessage = { text: string; displayText: string };
+type QueuedMessage = { text: string; displayText: string; inboxId?: number };
 
 function getPasteBlockToken(block: Pick<PasteBlock, "id" | "lines" | "isImage">): string {
   if (block.isImage) {
@@ -1425,6 +1425,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const finishTurnProcessing = useCallback(() => {
     const nextQueued = queuedMessagesRef.current.shift();
     if (nextQueued) {
+      if (nextQueued.inboxId != null) agent.acknowledgeFollowUp(nextQueued.inboxId);
       setQueuedMessages(queuedMessagesRef.current.map((msg) => msg.displayText));
       isProcessingRef.current = false;
       void processMessageRef.current(nextQueued.text, nextQueued.displayText);
@@ -1433,7 +1434,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
     isProcessingRef.current = false;
     setIsProcessing(false);
-  }, []);
+  }, [agent]);
 
   const beginLiveTurn = useCallback(
     (turn: Omit<ActiveTurnState, "latestAssistantText" | "flushedAssistantChars">) => {
@@ -2207,6 +2208,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       interruptedRunIdRef.current = activeRunIdRef.current;
       queuedMessagesRef.current = [];
       setQueuedMessages([]);
+      agent.clearPendingFollowUps();
       const activeAgent = activeTurnRef.current?.agent ?? agent;
       activeTurnRef.current = null;
       clearLiveTurnUi();
@@ -2259,6 +2261,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   }, [interruptActiveRun, renderer]);
 
   const resetToNewSession = useCallback(() => {
+    agent.clearPendingFollowUps();
     const snapshot = agent.startNewSession();
     setMessages(snapshot?.entries ?? []);
     setExpandedMessages(new Set());
@@ -2414,6 +2417,20 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   useEffect(() => {
     processMessageRef.current = processMessage;
   }, [processMessage]);
+  const queueRestoredRef = useRef(false);
+  useEffect(() => {
+    if (queueRestoredRef.current) return;
+    queueRestoredRef.current = true;
+    const pending = agent.listPendingFollowUps();
+    if (pending.length > 0) {
+      queuedMessagesRef.current = pending.map((item) => ({
+        text: item.text,
+        displayText: item.displayText,
+        inboxId: item.id,
+      }));
+      setQueuedMessages(pending.map((item) => item.displayText));
+    }
+  }, [agent]);
   useEffect(
     () =>
       agent.onSubagentStatus((status) => {
@@ -3710,7 +3727,12 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     }
     const { enhancedMessage } = processAtMentions(message.trim(), agent.getCwd());
     if (isProcessingRef.current) {
-      queuedMessagesRef.current.push({ text: enhancedMessage, displayText });
+      const inboxId = agent.enqueueFollowUp(enhancedMessage, displayText);
+      queuedMessagesRef.current.push({
+        text: enhancedMessage,
+        displayText,
+        inboxId: inboxId ?? undefined,
+      });
       setQueuedMessages(queuedMessagesRef.current.map((msg) => msg.displayText));
       setTimeout(scrollToBottom, 10);
       return;

@@ -16,13 +16,24 @@ import type {
 } from "../hooks/types";
 import { shutdownWorkspaceLspManager } from "../lsp/runtime";
 import {
+  appendMessages,
   appendSystemMessage,
   buildChatEntries,
+  clearInbox,
+  clearTurnClaim,
+  deleteInboxItem,
+  deletePersistedMessage,
+  deleteTurnDraft as deleteStoredTurnDraft,
+  enqueueInbox,
   getSessionTotalTokens,
+  listInbox,
   loadTranscript,
   loadTranscriptState,
   recordUsageEvent,
   SessionStore,
+  setTurnClaim,
+  upsertTurnDraft as storeTurnDraft,
+  sweepInterruptedTurn,
 } from "../storage/index";
 import { BashTool } from "../tools/bash";
 import { type ScheduleDaemonStatus, ScheduleManager, type StoredSchedule } from "../tools/schedule";
@@ -188,6 +199,7 @@ export class Agent {
       this.workspace = this.sessionStore.getWorkspace();
       this.session = this.sessionStore.openSession(options.session, this.modelId, this.mode, this.bash.getCwd());
       this.mode = this.session.mode;
+      sweepInterruptedTurn(this.session.id);
       const transcript = loadTranscriptState(this.session.id);
       this.messages = transcript.messages;
       this.messageSeqs = transcript.seqs;
@@ -390,6 +402,46 @@ export class Agent {
 
   addPermissionRule(rule: PermissionRule): void {
     this.permissionStore.addRule(rule);
+  }
+
+  persistTurnUser(userMessage: ModelMessage): number | null {
+    if (!this.sessionStore || !this.session) return null;
+    return appendMessages(this.session.id, [userMessage])[0] ?? null;
+  }
+
+  updateTurnDraft(text: string): void {
+    if (!this.sessionStore || !this.session) return;
+    storeTurnDraft(this.session.id, text);
+  }
+
+  deleteTurnDraft(): void {
+    if (!this.sessionStore || !this.session) return;
+    deleteStoredTurnDraft(this.session.id);
+  }
+
+  abandonPersistedTurn(userSeq: number | null): void {
+    if (!this.sessionStore || !this.session) return;
+    if (userSeq != null) deletePersistedMessage(this.session.id, userSeq);
+    deleteStoredTurnDraft(this.session.id);
+  }
+
+  enqueueFollowUp(text: string, displayText: string): number | null {
+    if (!this.sessionStore || !this.session) return null;
+    return enqueueInbox(this.session.id, text, displayText);
+  }
+
+  acknowledgeFollowUp(id: number): void {
+    deleteInboxItem(id);
+  }
+
+  listPendingFollowUps(): Array<{ id: number; text: string; displayText: string }> {
+    if (!this.sessionStore || !this.session) return [];
+    return listInbox(this.session.id);
+  }
+
+  clearPendingFollowUps(): void {
+    if (!this.sessionStore || !this.session) return;
+    clearInbox(this.session.id);
   }
 
   respondToToolApproval(approvalId: string, approved: boolean): void {
@@ -776,6 +828,10 @@ export class Agent {
       get resolvePermission() {
         return agent.permissionResolver ?? undefined;
       },
+      persistTurnUser: (userMessage) => agent.persistTurnUser(userMessage),
+      updateTurnDraft: (text) => agent.updateTurnDraft(text),
+      deleteTurnDraft: () => agent.deleteTurnDraft(),
+      abandonPersistedTurn: (userSeq) => agent.abandonPersistedTurn(userSeq),
       fireHook: (input, signal) => this.fireHook(input, signal),
       recordUsage: (usage, source, model) => this.recordUsage(usage, source, model),
       emitSubagentStatus: (status) => this.emitSubagentStatus(status),
@@ -792,7 +848,18 @@ export class Agent {
     userMessage: string,
     observer?: ProcessMessageObserver,
   ): AsyncGenerator<StreamChunk, void, unknown> {
-    yield* processMessageLoop(this.loopContext, userMessage, observer);
+    const sessionId = this.session?.id ?? null;
+    const hasStore = !!this.sessionStore && !!sessionId;
+    if (hasStore && sessionId) {
+      setTurnClaim(sessionId, userMessage.slice(0, 200));
+    }
+    try {
+      yield* processMessageLoop(this.loopContext, userMessage, observer);
+    } finally {
+      if (hasStore && sessionId) {
+        clearTurnClaim(sessionId);
+      }
+    }
   }
 
   private appendCompletedTurn(

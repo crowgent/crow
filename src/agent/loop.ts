@@ -110,6 +110,10 @@ export interface LoopContext {
   listDelegations(): Promise<ToolResult>;
   evaluatePermission(action: string, resource: string): PermissionEffect;
   resolvePermission?: PermissionResolver;
+  persistTurnUser(userMessage: ModelMessage): number | null;
+  updateTurnDraft(text: string): void;
+  deleteTurnDraft(): void;
+  abandonPersistedTurn(userSeq: number | null): void;
 }
 
 function getCompactionSettings(maxTokens: number): CompactionSettings {
@@ -398,6 +402,7 @@ export function appendCompletedTurn(
   userMessage: ModelMessage,
   newMessages: ModelMessage[],
   thought?: { durationMs: number; text: string },
+  userSeq: number | null = null,
 ): void {
   if (newMessages.length === 0) return;
 
@@ -411,15 +416,23 @@ export function appendCompletedTurn(
     return;
   }
 
-  const insertedSeqs = appendMessages(ctx.session.id, [userMessage, ...newMessages]);
+  const insertedSeqs =
+    userSeq != null
+      ? appendMessages(ctx.session.id, newMessages)
+      : appendMessages(ctx.session.id, [userMessage, ...newMessages]);
   if (userIndex >= 0) {
-    ctx.messageSeqs[userIndex] = insertedSeqs[0] ?? ctx.messageSeqs[userIndex];
+    ctx.messageSeqs[userIndex] = userSeq ?? insertedSeqs[0] ?? ctx.messageSeqs[userIndex];
   }
   ctx.messages.push(...newMessages);
-  ctx.messageSeqs.push(...insertedSeqs.slice(1));
+  ctx.messageSeqs.push(...(userSeq != null ? insertedSeqs : insertedSeqs.slice(1)));
   if (thought != null) {
     const firstAssistantIndex = newMessages.findIndex((message) => message.role === "assistant");
-    const firstAssistantSeq = firstAssistantIndex >= 0 ? insertedSeqs[1 + firstAssistantIndex] : undefined;
+    const firstAssistantSeq =
+      firstAssistantIndex >= 0
+        ? userSeq != null
+          ? insertedSeqs[firstAssistantIndex]
+          : insertedSeqs[1 + firstAssistantIndex]
+        : undefined;
     if (firstAssistantSeq != null) {
       recordThought(ctx.session.id, firstAssistantSeq, thought.durationMs, thought.text);
     }
@@ -507,6 +520,12 @@ export async function* processMessage(
     return;
   }
 
+  const turnUserSeq = ctx.persistTurnUser(userModelMessage);
+  if (turnUserSeq != null) {
+    const userIndex = ctx.messages.lastIndexOf(userModelMessage);
+    if (userIndex >= 0) ctx.messageSeqs[userIndex] = turnUserSeq;
+  }
+
   try {
     while (true) {
       let assistantText = "";
@@ -517,6 +536,7 @@ export async function* processMessage(
       let completedSteps = 0;
       let shouldRetry = false;
       let retryError: unknown = null;
+      let lastDraftWrite = 0;
       const activeToolCalls: ToolCall[] = [];
 
       try {
@@ -610,6 +630,13 @@ export async function* processMessage(
           switch (part.type) {
             case "text-delta":
               assistantText += part.text;
+              {
+                const now = Date.now();
+                if (now - lastDraftWrite > 500) {
+                  lastDraftWrite = now;
+                  ctx.updateTurnDraft(assistantText);
+                }
+              }
               yield { type: "content", content: part.text };
               break;
 
@@ -703,10 +730,13 @@ export async function* processMessage(
         }
 
         if (signal.aborted) {
+          ctx.abandonPersistedTurn(turnUserSeq);
           ctx.discardAbortedTurn(userModelMessage);
           yield { type: "done" };
           return;
         }
+
+        if (assistantText.trim()) ctx.updateTurnDraft(assistantText);
 
         if (shouldRetry) {
           const delayMs = computeRetryDelayMs(modelRetryAttempt, retryError);
@@ -753,7 +783,8 @@ export async function* processMessage(
                 }
               } catch {}
             }
-            appendCompletedTurn(ctx, userModelMessage, savedMessages, thought);
+            appendCompletedTurn(ctx, userModelMessage, savedMessages, thought, turnUserSeq);
+            ctx.deleteTurnDraft();
             await ctx.refreshSessionRecap(signal);
             streamOk = true;
           }
@@ -782,13 +813,21 @@ export async function* processMessage(
         }
 
         if (signal.aborted) {
+          ctx.abandonPersistedTurn(turnUserSeq);
           ctx.discardAbortedTurn(userModelMessage);
           yield { type: "done" };
           return;
         }
 
         if (!streamOk && assistantText.trim()) {
-          appendCompletedTurn(ctx, userModelMessage, [{ role: "assistant", content: assistantText }], thought);
+          appendCompletedTurn(
+            ctx,
+            userModelMessage,
+            [{ role: "assistant", content: assistantText }],
+            thought,
+            turnUserSeq,
+          );
+          ctx.deleteTurnDraft();
           await ctx.refreshSessionRecap(signal);
         }
 
@@ -803,6 +842,7 @@ export async function* processMessage(
         return;
       } catch (err: unknown) {
         if (signal.aborted) {
+          ctx.abandonPersistedTurn(turnUserSeq);
           ctx.discardAbortedTurn(userModelMessage);
           yield { type: "content", content: "\n\n[Cancelled]" };
           yield { type: "done" };
@@ -844,7 +884,14 @@ export async function* processMessage(
           isAuthError: authError,
         };
         if (assistantText.trim()) {
-          appendCompletedTurn(ctx, userModelMessage, [{ role: "assistant", content: assistantText }]);
+          appendCompletedTurn(
+            ctx,
+            userModelMessage,
+            [{ role: "assistant", content: assistantText }],
+            undefined,
+            turnUserSeq,
+          );
+          ctx.deleteTurnDraft();
         }
 
         const stopFailureInput: StopFailureHookInput = {
