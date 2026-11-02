@@ -10,42 +10,24 @@
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/language-TypeScript-blue" alt="TypeScript"></a>
 </p>
 
-# Crow
+<h1 align="center">Crow</h1>
 
+<p align="center">
 Crow is a lightweight, minimal AI coding agent for the terminal. Connect any
 OpenAI-compatible provider, or add your own, and code without the bloat.
+</p>
 
 ## Features
 
-- **207 built-in OpenAI-compatible providers**, plus a native xai provider with
-  grok models, plus your own custom provider through the `/connect` wizard
-- **Custom provider models, all of them**: `/connect` offers two choices —
-  fetch every model from the base URL (all of them are saved, you pick the
-  default) or enter one model id manually. `/model` shows every model for the
-  provider, not just the one you entered
-- **Keys saved one way only**: through `/connect` into `~/.crow/auth.json`
-  (mode 600). Nothing is written to env files
-- **Subagents**: one `.md` file per agent, a `/agents` panel, `/agents assign`
-  for direct dispatch, and `/<name>` to call an agent by name. Foreground runs
-  persist as child sessions; background runs are detached and keep working
-  after the TUI closes
-- **Shell tool**: runs in the configured shell (`shell` in settings, then
-  `$SHELL`, then bash, then sh; PowerShell arguments for pwsh), verifies
-  permissions before spawning, captures output to a file and returns a bounded
-  tail, notifies when background commands finish, and stops the shell when the
-  turn is aborted. The legacy `bash` tool is kept for persistent-cwd work and
-  background process management
-- **Durable agent loop**: retries with backoff, a graceful step cap, a tool
-  output cap with full output saved to files, a permission system
-  (allow/deny/ask, with shell and bash allowed by default), crash recovery
-  that marks interrupted turns, a durable inbox, and a per-session token budget
-- **Working tools**: todo lists, URL fetching, multiple-choice questions,
-  git worktrees, snapshots, image generation, session forking (`/fork`),
-  session transfer (`/transfer`), and budget control (`/budget`)
-- **TUI**: title-only header, a Thought line with reasoning, a single-row dot
-  spinner while processing, and wrapping list navigation
-- **Telegram headless bridge**: run the agent from Telegram with rich message
-  drafts, plus headless `--prompt` mode for scripts
+> - 207 built-in providers, native xai, and custom providers via /connect
+> - All custom models fetched and saved, or one entered manually; /model shows them all
+> - Keys only via /connect into ~/.crow/auth.json (600), never env files
+> - Subagents from .md files, /agents panel, direct dispatch, child sessions
+> - Shell tool with configured shell, permission checks, file-backed output
+> - Durable loop: retries, step cap, output cap, permissions, crash recovery, token budget
+> - Todo, fetch, questions, worktrees, snapshots, images, /fork, /transfer, /budget
+> - TUI with Thought line, single-row spinner, wrapping navigation
+> - Telegram bridge with rich drafts, plus headless --prompt mode
 
 ## Requirements
 
@@ -142,24 +124,6 @@ Environment variables:
 | Variable | Purpose |
 | --- | --- |
 | `CROW_PROVIDER` | Provider id to use, for example `deepseek` |
-
-## TUI commands
-
-| Command | What it does |
-| --- | --- |
-| `/connect` (`/login`) | Choose a provider and enter its API key |
-| `/model` (`/models`) | Select a model for the selected provider |
-| `/agents` | Manage custom sub-agents (`/agents assign <name> <task>`) |
-| `/fork` | Fork the current session |
-| `/transfer <path>` | Move the session to another directory |
-| `/budget` | Show or set the session token budget |
-| `/schedule` | View scheduled runs |
-| `/sandbox` | Select shell sandbox mode |
-| `/mcp` | Manage MCP servers |
-| `/remote-control` | Start the Telegram bridge |
-| `/recap` | Refresh the session recap |
-| `/clear` | Clear the session |
-| `/exit` (`/quit`) | Quit the CLI |
 
 ## Development
 
