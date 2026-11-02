@@ -1,0 +1,23 @@
+{
+  "cpu": [
+    "arm64"
+  ],
+  "description": "Crow CLI binary for macOS arm64.",
+  "files": [
+    "bin"
+  ],
+  "license": "MIT",
+  "name": "@crowgentai/crow-darwin-arm64",
+  "os": [
+    "darwin"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "directory": "package/crow-darwin-arm64",
+    "type": "git",
+    "url": "https://github.com/crowgent/crow.git"
+  },
+  "version": "1.1.27"
+}
