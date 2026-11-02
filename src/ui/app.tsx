@@ -4901,7 +4901,13 @@ function MessageView({
           {entry.thought ? (
             <ThoughtLine t={t} durationMs={entry.thought.durationMs} fullText={entry.thought.text} />
           ) : null}
-          <Markdown content={entry.content} t={t} />
+          {entry.thought ? (
+            <box marginTop={1} flexShrink={0}>
+              <Markdown content={entry.content} t={t} />
+            </box>
+          ) : (
+            <Markdown content={entry.content} t={t} />
+          )}
         </box>
       );
 
