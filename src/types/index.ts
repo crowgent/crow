@@ -82,6 +82,7 @@ export interface BackgroundProcessInfo {
   id: number;
   pid: number;
   command: string;
+  logPath?: string;
 }
 
 export interface MediaAsset {

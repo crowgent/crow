@@ -21,6 +21,7 @@ function jsonInput(input: Record<string, unknown>): string {
 
 export const GATED_TOOLS: Record<string, ResourceExtractor> = {
   bash: stringField("command"),
+  shell: stringField("command"),
   process_stop: (input) => String(input.id ?? ""),
   write_file: stringField("path"),
   edit_file: stringField("path"),

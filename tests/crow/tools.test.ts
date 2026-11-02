@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createTools } from "../../src/crow/tools";
 import { BashTool } from "../../src/tools/bash";
@@ -283,5 +286,49 @@ describe("schedule daemon tools", () => {
       undefined,
     );
     expect(result).toEqual({ success: true, output: "done" });
+  });
+});
+
+describe("shell tool", () => {
+  it("exposes an opencode-style shell with background streaming", () => {
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent");
+    const shellTool = tools.shell as { description?: string };
+
+    expect(shellTool.description).toContain("Execute a shell command and return its output");
+    expect(shellTool.description).toContain("shell ID");
+    expect(shellTool.description).toContain("stream output to a file");
+  });
+
+  it("runs a command in the given workdir", async () => {
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent") as Record<
+      string,
+      { execute: (input: unknown, context?: unknown) => Promise<unknown> }
+    >;
+    const dir = await mkdtemp(join(tmpdir(), "crow-shell-test-"));
+
+    try {
+      const result = (await tools.shell.execute({ command: "pwd", workdir: dir }, {})) as {
+        success: boolean;
+        output: string;
+      };
+      expect(result).toEqual({ success: true, output: dir });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns a shell ID and log file for background commands", async () => {
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent") as Record<
+      string,
+      { execute: (input: unknown, context?: unknown) => Promise<unknown> }
+    >;
+    const result = (await tools.shell.execute({ command: "echo shell-bg-ok", background: true }, {})) as {
+      success: boolean;
+      output: string;
+    };
+    expect(result.success).toBe(true);
+    expect(result.output).toContain("shell ID");
+    expect(result.output).toContain("streaming to");
+    expect(result.output).toContain("process_logs");
   });
 });

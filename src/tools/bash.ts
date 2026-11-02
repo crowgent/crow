@@ -90,75 +90,7 @@ export class BashTool {
         return { success: false, error: prepared.error };
       }
 
-      return await new Promise<ToolResult>((resolve) => {
-        let settled = false;
-        let aborted = false;
-        let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
-
-        const finish = (result: ToolResult) => {
-          if (settled) return;
-          settled = true;
-          if (forceKillTimer) clearTimeout(forceKillTimer);
-          abortSignal?.removeEventListener("abort", onAbort);
-          resolve(result);
-        };
-
-        const child = exec(
-          prepared.command,
-          {
-            cwd: this.cwd,
-            timeout,
-            maxBuffer: 10 * 1024 * 1024,
-            env: { ...process.env, FORCE_COLOR: "0" },
-          },
-          (err, stdout, stderr) => {
-            if (aborted || abortSignal?.aborted) {
-              finish({ success: false, error: "[Cancelled]" });
-              return;
-            }
-
-            const output = stdout + (stderr ? `\nSTDERR: ${stderr}` : "");
-            if (err) {
-              const sandboxError = this.formatSandboxRuntimeError(output, err.message);
-              if (sandboxError) {
-                finish({ success: false, error: sandboxError });
-                return;
-              }
-              if (output.trim()) {
-                finish({ success: false, error: output.trim() });
-                return;
-              }
-              finish({ success: false, error: `Command failed: ${err.message}` });
-              return;
-            }
-
-            finish({
-              success: true,
-              output: output.trim() || "Command executed successfully (no output)",
-            });
-          },
-        );
-
-        const onAbort = () => {
-          aborted = true;
-          try {
-            child.kill("SIGTERM");
-          } catch {
-            finish({ success: false, error: "[Cancelled]" });
-            return;
-          }
-
-          forceKillTimer = setTimeout(() => {
-            try {
-              child.kill("SIGKILL");
-            } catch {
-              /* already exited */
-            }
-          }, 1_000);
-        };
-
-        abortSignal?.addEventListener("abort", onAbort, { once: true });
-      });
+      return await this.runExec(prepared.command, timeout, abortSignal);
     } catch (err: unknown) {
       if (err && typeof err === "object" && "stdout" in err) {
         const execErr = err as { stdout?: string; stderr?: string; message: string };
@@ -172,7 +104,116 @@ export class BashTool {
     }
   }
 
-  async startBackground(command: string): Promise<ToolResult> {
+  async executeIn(command: string, cwd: string, timeout = 120_000, abortSignal?: AbortSignal): Promise<ToolResult> {
+    const target = path.resolve(this.cwd, cwd);
+    try {
+      const info = await stat(target);
+      if (!info.isDirectory()) {
+        return { success: false, error: `Working directory is not a directory: ${target}` };
+      }
+    } catch {
+      return { success: false, error: `Working directory does not exist: ${target}` };
+    }
+    if (abortSignal?.aborted) {
+      return { success: false, error: "[Cancelled]" };
+    }
+    const previous = this.cwd;
+    this.cwd = target;
+    try {
+      const prepared = this.prepareCommand(command);
+      if (!prepared.ok) {
+        return { success: false, error: prepared.error };
+      }
+      return await this.runExec(prepared.command, timeout, abortSignal);
+    } finally {
+      this.cwd = previous;
+    }
+  }
+
+  private runExec(command: string, timeout: number, abortSignal?: AbortSignal): Promise<ToolResult> {
+    return new Promise<ToolResult>((resolve) => {
+      let settled = false;
+      let aborted = false;
+      let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const finish = (result: ToolResult) => {
+        if (settled) return;
+        settled = true;
+        if (forceKillTimer) clearTimeout(forceKillTimer);
+        abortSignal?.removeEventListener("abort", onAbort);
+        resolve(result);
+      };
+
+      const child = exec(
+        command,
+        {
+          cwd: this.cwd,
+          timeout,
+          maxBuffer: 10 * 1024 * 1024,
+          env: { ...process.env, FORCE_COLOR: "0" },
+        },
+        (err, stdout, stderr) => {
+          if (aborted || abortSignal?.aborted) {
+            finish({ success: false, error: "[Cancelled]" });
+            return;
+          }
+
+          const output = stdout + (stderr ? `\nSTDERR: ${stderr}` : "");
+          if (err) {
+            const sandboxError = this.formatSandboxRuntimeError(output, err.message);
+            if (sandboxError) {
+              finish({ success: false, error: sandboxError });
+              return;
+            }
+            if (output.trim()) {
+              finish({ success: false, error: output.trim() });
+              return;
+            }
+            finish({ success: false, error: `Command failed: ${err.message}` });
+            return;
+          }
+
+          finish({
+            success: true,
+            output: output.trim() || "Command executed successfully (no output)",
+          });
+        },
+      );
+
+      const onAbort = () => {
+        aborted = true;
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          finish({ success: false, error: "[Cancelled]" });
+          return;
+        }
+
+        forceKillTimer = setTimeout(() => {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            /* already exited */
+          }
+        }, 1_000);
+      };
+
+      abortSignal?.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+
+  async startBackground(command: string, cwd?: string): Promise<ToolResult> {
+    const runCwd = cwd ? path.resolve(this.cwd, cwd) : this.cwd;
+    if (cwd) {
+      try {
+        const info = await stat(runCwd);
+        if (!info.isDirectory()) {
+          return { success: false, output: `Working directory is not a directory: ${runCwd}` };
+        }
+      } catch {
+        return { success: false, output: `Working directory does not exist: ${runCwd}` };
+      }
+    }
     const alive = [...this.bgProcesses.values()].filter((p) => p.alive);
     if (alive.length >= MAX_BACKGROUND_PROCESSES) {
       return {
@@ -192,7 +233,7 @@ export class BashTool {
       const logStream = createWriteStream(logPath, { flags: "a" });
 
       const child = spawn("sh", ["-c", prepared.command], {
-        cwd: this.cwd,
+        cwd: runCwd,
         detached: false,
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env, FORCE_COLOR: "0" },
@@ -205,7 +246,7 @@ export class BashTool {
         id,
         command,
         pid: child.pid ?? 0,
-        cwd: this.cwd,
+        cwd: runCwd,
         startedAt: new Date(),
         child,
         logPath,
@@ -233,7 +274,7 @@ export class BashTool {
           `Command: ${truncCmd(command, 80)}`,
           `Use process_logs(${id}) to view output, process_stop(${id}) to terminate.`,
         ].join("\n"),
-        backgroundProcess: { id, pid: entry.pid, command },
+        backgroundProcess: { id, pid: entry.pid, command, logPath },
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

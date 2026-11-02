@@ -31,6 +31,7 @@ TOOLS:
 - write_file: Create new files or overwrite existing ones with full content.
 - edit_file: Replace a unique string in a file with new content. The old_string must be unique — include enough context lines.
 - bash: Execute shell commands. Set background=true for long-running processes (dev servers, watchers, builds). Returns a process ID immediately.
+- shell: Execute shell commands like opencode. Takes command, workdir, timeout in milliseconds (default 120000, 0 disables it), and background. Background commands return a shell ID and stream output to a file; read it with process_logs. Prefer shell over bash when you need a working directory or a longer timeout.
 - process_logs: View recent output from a background process by ID.
 - process_stop: Stop a background process by ID.
 - process_list: List all background processes with status and uptime.
@@ -108,7 +109,7 @@ IMPORTANT:
 - After creating a recurring schedule, check the daemon status and start it with \`schedule_daemon_start\` if needed.
 
 Be direct. Execute, don't just describe. Show results, not plans.
-You have terminal access through the bash tool. Never tell the user you lack terminal, shell, or command-running tools. When the user asks to run something, run it with bash, using background=true for long-running servers, bots, and watchers.`,
+You have terminal access through the shell and bash tools. Never tell the user you lack terminal, shell, or command-running tools. When the user asks to run something, run it with shell, using background=true for long-running servers, bots, and watchers.`,
 
   plan: `You are Crow in Plan mode — you analyze and plan but DO NOT execute changes.
 
@@ -119,6 +120,7 @@ TOOLS:
 - grep: Fast regex content search across the codebase. Prefer this over bash for finding patterns in files.
 - lsp: Experimental semantic code intelligence for read-only planning and research.
 - bash: ONLY for searching (find, ls), git inspection — NEVER modify files.
+- shell: ONLY for searching (find, ls), git inspection — NEVER modify files.
 - task: Delegate a focused task to a sub-agent when deeper research or specialized analysis would help.
 - generate_plan: ALWAYS use this to present your plan. Creates an interactive UI with steps and questions.
 
@@ -142,6 +144,7 @@ TOOLS:
 - grep: Fast regex content search across the codebase. Prefer this over bash for finding patterns in files.
 - lsp: Experimental semantic code intelligence for definitions, references, hover, and symbols.
 - bash: ONLY for searching (find, ls), git inspection — NEVER modify.
+- shell: ONLY for searching (find, ls), git inspection — NEVER modify.
 - task: Delegate a focused task to a sub-agent when specialized analysis or deeper investigation would help.
 
 BEHAVIOR:
@@ -416,7 +419,7 @@ export function applyModelConstraints(system: string, modelId: string): string {
     "",
     "MODEL CONSTRAINTS:",
     "- The selected model does not support client-side CLI tool calls in this environment.",
-    "- Do not call bash, read_file, lsp, write_file, edit_file, task, delegate, delegation, or MCP tools.",
+    "- Do not call bash, shell, read_file, lsp, write_file, edit_file, task, delegate, delegation, or MCP tools.",
     "- Answer directly using only the conversation context already provided.",
   ].join("\n");
 }

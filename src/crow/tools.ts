@@ -156,6 +156,89 @@ export function createTools(
       },
     }),
 
+    shell: tool({
+      description:
+        "Execute a shell command and return its output. Commands run on Linux using sh. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately with a shell ID and stream output to a file; use process_logs to read it.",
+      inputSchema: z.object({
+        command: z.string().describe("Shell command string to execute"),
+        workdir: z
+          .string()
+          .optional()
+          .describe(
+            "Working directory to execute the command in. Defaults to the current working directory. When possible, avoid changing directories in the command and set the working directory here instead.",
+          ),
+        timeout: z
+          .number()
+          .optional()
+          .describe(
+            "Timeout in milliseconds. Set to 0 to disable the timeout. Defaults to 120000 for foreground commands. Background commands have no timeout by default.",
+          ),
+        background: z
+          .boolean()
+          .optional()
+          .describe(
+            "Run the command in the background and return immediately (useful for dev servers and long-running builds). You do not need to use '&' at the end of the command when using this parameter. Output streams to a file; read it with process_logs.",
+          ),
+      }),
+      execute: async ({ command, workdir, timeout, background }, { abortSignal }) => {
+        const toolInput = { command, workdir, timeout, background };
+        const preResult = await executePreToolHooks("shell", toolInput, cwd(), options.sessionId, abortSignal);
+        if (preResult.blocked) {
+          const reason = preResult.blockingErrors.map((e) => e.stderr).join("; ") || "Blocked by hook";
+          return { success: false, output: `[Hook blocked] ${reason}` };
+        }
+
+        if (background) {
+          const started = await bash.startBackground(command, workdir);
+          if (!started.success || !started.backgroundProcess) {
+            executePostToolFailureHooks(
+              "shell",
+              toolInput,
+              started.output || "Failed to start background command",
+              cwd(),
+              options.sessionId,
+              abortSignal,
+            ).catch(() => {});
+            return { success: false, output: started.output || "Failed to start background command" };
+          }
+          const info = started.backgroundProcess;
+          const output = {
+            success: true,
+            output: [
+              `Command moved to the background (shell ID: ${info.id}).`,
+              ...(info.logPath ? [`Output is streaming to: ${info.logPath}`] : []),
+              `Use process_logs(${info.id}) to view output, process_stop(${info.id}) to terminate.`,
+            ].join("\n"),
+          };
+          executePostToolHooks("shell", toolInput, output, cwd(), options.sessionId, abortSignal).catch(() => {});
+          return output;
+        }
+
+        const result = await bash.executeIn(command, workdir ?? cwd(), timeout ?? 120_000, abortSignal);
+        const output = {
+          success: result.success,
+          output: result.success
+            ? result.output || "Command executed successfully (no output)"
+            : result.error || "Command failed",
+        };
+
+        if (result.success) {
+          executePostToolHooks("shell", toolInput, output, cwd(), options.sessionId, abortSignal).catch(() => {});
+        } else {
+          executePostToolFailureHooks(
+            "shell",
+            toolInput,
+            result.error || "Command failed",
+            cwd(),
+            options.sessionId,
+            abortSignal,
+          ).catch(() => {});
+        }
+
+        return output;
+      },
+    }),
+
     process_logs: tool({
       description:
         "View recent output (stdout + stderr) from a background process by its ID. Returns the last N lines of the log.",
