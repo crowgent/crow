@@ -4074,7 +4074,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               {/* Streaming assistant content */}
               {streamContent && (
                 <box paddingLeft={3} marginTop={1} flexShrink={0}>
-                  <Markdown content={streamContent} t={t} />
+                  <Markdown content={streamContent} t={t} streaming />
                 </box>
               )}
               {/* Waiting indicator */}
@@ -5043,23 +5043,32 @@ function MessageView({
 
       if (name === "read_file")
         return (
-          <InlineTool
-            t={t}
-            pending={false}
-          >{`Read ${trunc(tryParseArg(entry.toolCall, "path") || args, 60)}`}</InlineTool>
+          <box gap={0}>
+            <InlineTool
+              t={t}
+              pending={false}
+            >{`Read ${trunc(tryParseArg(entry.toolCall, "path") || args, 60)}`}</InlineTool>
+            <ToolOutputView t={t} content={entry.content} />
+          </box>
         );
       if (name === "search_web" || name === "search_x")
         return (
-          <InlineTool t={t} pending={false}>
-            {name === "search_web" ? "Web" : "X"}
-            {` Search "${trunc(args, 60)}"`}
-          </InlineTool>
+          <box gap={0}>
+            <InlineTool t={t} pending={false}>
+              {name === "search_web" ? "Web" : "X"}
+              {` Search "${trunc(args, 60)}"`}
+            </InlineTool>
+            <ToolOutputView t={t} content={entry.content} />
+          </box>
         );
 
       return (
-        <InlineTool t={t} pending={false}>
-          {trunc(name === "bash" ? args : `${name} ${args}`, 80)}
-        </InlineTool>
+        <box gap={0}>
+          <InlineTool t={t} pending={false}>
+            {trunc(name === "bash" ? args : `${name} ${args}`, 80)}
+          </InlineTool>
+          <ToolOutputView t={t} content={entry.content} />
+        </box>
       );
     }
 
@@ -5537,6 +5546,18 @@ function truncateBlock(text: string, maxLines: number): string {
   const lines = text.split("\n");
   if (lines.length <= maxLines) return text;
   return [...lines.slice(0, maxLines), `… ${lines.length - maxLines} more lines`].join("\n");
+}
+
+function ToolOutputView({ t, content }: { t: Theme; content: string }) {
+  const lines = content.split("\n");
+  const shown = lines.slice(0, 30);
+  const extra = lines.length - shown.length;
+  return (
+    <box paddingLeft={5} marginTop={1} flexShrink={0} flexDirection="column">
+      <text fg={t.textMuted}>{shown.join("\n")}</text>
+      {extra > 0 && <text fg={t.textDim}>… {extra} more lines not shown</text>}
+    </box>
+  );
 }
 
 function ToolTextOutputView({ t, label, content }: { t: Theme; label: string; content: string }) {
@@ -6561,6 +6582,7 @@ function toolArgs(tc?: ToolCall): string {
   try {
     const a = JSON.parse(tc.function.arguments);
     if (tc.function.name === "bash") return a.command || "";
+    if (tc.function.name === "shell") return a.command || "";
     if (tc.function.name === "read_file" || tc.function.name === "write_file" || tc.function.name === "edit_file")
       return a.path || "";
     if (tc.function.name === "generate_image" || tc.function.name === "generate_video") return a.prompt || "";
