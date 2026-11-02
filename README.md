@@ -10,7 +10,6 @@
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/language-TypeScript-blue" alt="TypeScript"></a>
 </p>
 
-<h1 align="center">Crow</h1>
 
 <p align="center">
 Crow is a lightweight, minimal AI coding agent for the terminal. Connect any
