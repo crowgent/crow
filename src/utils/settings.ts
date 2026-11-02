@@ -156,6 +156,7 @@ export interface UserSettings {
   subagents?: SubagentSettings;
   hooks?: HooksConfig;
   modeModels?: Partial<Record<AgentMode, string>>;
+  shell?: string;
 }
 
 export interface ProjectSettings {

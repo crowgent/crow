@@ -168,7 +168,7 @@ export class Agent {
   private recapsEnabled = true;
   private permissionStore = new PermissionStore();
   private permissionResolver: PermissionResolver | null = null;
-  private shell = new ShellService();
+  private shell = new ShellService(undefined, loadUserSettings().shell);
   private pendingShellNotes: string[] = [];
   private questionResolver: QuestionResolver | null = null;
   private sessionTokenBudget = 0;
@@ -405,7 +405,11 @@ export class Agent {
   }
 
   async cleanup(): Promise<void> {
-    await Promise.allSettled([this.bash.cleanup(), shutdownWorkspaceLspManager(this.bash.getCwd())]);
+    await Promise.allSettled([
+      this.bash.cleanup(),
+      this.shell.cleanup(),
+      shutdownWorkspaceLspManager(this.bash.getCwd()),
+    ]);
   }
 
   setPermissionResolver(resolver: PermissionResolver | null): void {

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { accessSync, constants, readFileSync, statSync } from "node:fs";
-import { mkdir, readFile, stat, unlink } from "node:fs/promises";
+import { mkdir, stat, unlink } from "node:fs/promises";
 import { type ChildProcess, spawn } from "child_process";
 import { createWriteStream } from "fs";
 import os from "os";
@@ -48,16 +48,9 @@ export interface ShellRunOptions {
   onExit?: (event: ShellExitEvent) => void;
 }
 
-export interface ShellOutputPage {
-  output: string;
-  cursor: number;
-  size: number;
-  truncated: boolean;
-}
-
 export type CommandClassification = { kind: "scanned"; commands: string[] } | { kind: "opaque" };
 
-const COMPATIBLE_SHELLS = new Set(["bash", "dash", "ksh", "sh", "zsh"]);
+const DENIED_SHELLS = new Set(["fish", "nu"]);
 const COMMAND_WRAPPERS = new Set(["sudo", "command", "time", "nice", "env"]);
 const ENV_ASSIGN = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
@@ -79,20 +72,32 @@ function findOnPath(name: string): string | undefined {
   return undefined;
 }
 
-export function resolveShell(): string {
+function resolveCandidate(candidate: string): string | undefined {
+  const name = path.basename(candidate).toLowerCase();
+  if (DENIED_SHELLS.has(name)) return undefined;
+  if (path.isAbsolute(candidate) && isExecutableFile(candidate)) return candidate;
+  return findOnPath(candidate);
+}
+
+export function resolveShell(configured?: string): string {
+  if (configured) {
+    const found = resolveCandidate(configured);
+    if (found) return found;
+  }
   const envShell = process.env.SHELL;
   if (envShell) {
-    const name = path.basename(envShell).toLowerCase();
-    if (COMPATIBLE_SHELLS.has(name)) {
-      if (path.isAbsolute(envShell) && isExecutableFile(envShell)) return envShell;
-      const found = findOnPath(envShell);
-      if (found) return found;
-    }
+    const found = resolveCandidate(envShell);
+    if (found) return found;
   }
   return findOnPath("bash") ?? "/bin/sh";
 }
 
-export function shellArgs(command: string): string[] {
+export function shellArgs(shell: string, command: string): string[] {
+  const name = path.basename(shell).toLowerCase();
+  if (name === "pwsh" || name === "powershell") {
+    return ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command];
+  }
+  if (name === "cmd") return ["/c", command];
   return ["-c", command];
 }
 
@@ -195,7 +200,14 @@ export class ShellService {
   private exitOrder: string[] = [];
   private dirReady: Promise<void> | null = null;
 
-  constructor(private outputDir: string = path.join(os.homedir(), ".crow", "shell-outputs")) {}
+  constructor(
+    private outputDir: string = path.join(os.homedir(), ".crow", "shell-outputs"),
+    private configuredShell?: string,
+  ) {}
+
+  getResolvedShell(): string {
+    return resolveShell(this.configuredShell);
+  }
 
   private ensureDir(): Promise<void> {
     if (!this.dirReady) {
@@ -210,7 +222,7 @@ export class ShellService {
     if (!dirInfo) throw new Error(`Working directory does not exist: ${cwd}`);
     if (!dirInfo.isDirectory()) throw new Error(`Working directory is not a directory: ${cwd}`);
     await this.ensureDir();
-    const shell = resolveShell();
+    const shell = resolveShell(this.configuredShell);
     const id = randomBytes(6).toString("hex");
     const file = path.join(this.outputDir, `sh_${id}.out`);
     const info: ShellInfo = {
@@ -226,7 +238,7 @@ export class ShellService {
     const done = new Promise<ShellInfo>((resolve) => {
       resolveDone = resolve;
     });
-    const child = spawn(shell, shellArgs(command), {
+    const child = spawn(shell, shellArgs(shell, command), {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
       env: {
@@ -235,7 +247,7 @@ export class ShellService {
         TERM: "xterm-256color",
         AGENT: "1",
         CROW: "1",
-        AI_AGENT: "crow",
+        AI_AGENT: process.env.AI_AGENT ?? "crow",
         ...(options.sessionId ? { CROW_SESSION_ID: options.sessionId } : {}),
       },
     });
@@ -320,36 +332,11 @@ export class ShellService {
     return entry.done;
   }
 
-  get(id: string): ShellInfo | undefined {
-    return this.shells.get(id)?.info;
-  }
-
-  list(): ShellInfo[] {
-    return [...this.shells.values()].filter((entry) => entry.info.status === "running").map((entry) => entry.info);
-  }
-
   async result(id: string): Promise<ShellResult> {
     await this.wait(id);
     const entry = this.shells.get(id);
     if (!entry) throw new Error(`Unknown shell: ${id}`);
     return entry.lastResult ?? this.tailResult(entry);
-  }
-
-  async output(id: string, cursor = 0, limit = 65_536): Promise<ShellOutputPage> {
-    const entry = this.shells.get(id);
-    if (!entry) throw new Error(`Unknown shell: ${id}`);
-    let data: Buffer;
-    try {
-      data = await readFile(entry.info.file);
-    } catch {
-      return { output: "", cursor, size: entry.size, truncated: false };
-    }
-    const start = Math.max(0, cursor);
-    if (start >= data.length) {
-      return { output: "", cursor: data.length, size: data.length, truncated: false };
-    }
-    const end = Math.min(data.length, start + limit);
-    return { output: data.subarray(start, end).toString("utf8"), cursor: end, size: data.length, truncated: false };
   }
 
   stop(id: string): void {
@@ -368,18 +355,6 @@ export class ShellService {
       }
     }, FORCE_KILL_MS);
     entry.forceKillTimer.unref?.();
-  }
-
-  async remove(id: string): Promise<void> {
-    const entry = this.shells.get(id);
-    if (!entry) throw new Error(`Unknown shell: ${id}`);
-    if (entry.info.status === "running") {
-      this.stop(id);
-      await entry.done;
-    }
-    this.shells.delete(id);
-    this.exitOrder = this.exitOrder.filter((item) => item !== id);
-    await unlink(entry.info.file).catch(() => {});
   }
 
   async cleanup(): Promise<void> {

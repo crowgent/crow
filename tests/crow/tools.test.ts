@@ -349,4 +349,39 @@ describe("shell tool", () => {
     expect(result.exit).toBe(3);
     expect(result.output).toContain("Exited with code 3");
   });
+
+  it("names the resolved shell in its description", () => {
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent");
+    const shellTool = tools.shell as { description?: string };
+    expect(shellTool.description).toMatch(/Commands run on Linux using \w+\./);
+  });
+
+  it("tells the model to retry with a larger timeout", async () => {
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
+      shell: new ShellService(await mkdtemp(join(tmpdir(), "crow-shell-out-"))),
+    }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown> }>;
+    const result = (await tools.shell.execute({ command: "sleep 30", timeout: 100 }, {})) as {
+      success: boolean;
+      output: string;
+      timeout: boolean;
+    };
+    expect(result.success).toBe(false);
+    expect(result.timeout).toBe(true);
+    expect(result.output).toContain("Command exceeded timeout of 100 ms");
+    expect(result.output).toContain("Retry with a larger timeout");
+  });
+
+  it("stops the shell when the turn is aborted", async () => {
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
+      shell: new ShellService(await mkdtemp(join(tmpdir(), "crow-shell-out-"))),
+    }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown> }>;
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+    const result = (await tools.shell.execute({ command: "sleep 30" }, { abortSignal: controller.signal })) as {
+      success: boolean;
+      output: string;
+    };
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("Killed by SIGTERM");
+  });
 });

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { classifyCommand, resolveShell, SHELL_OUTPUT_MAX_LINES, ShellService } from "../../src/tools/shell";
+import { classifyCommand, resolveShell, SHELL_OUTPUT_MAX_LINES, ShellService, shellArgs } from "../../src/tools/shell";
 
 const tempDirs: string[] = [];
 const services: ShellService[] = [];
@@ -76,9 +76,7 @@ describe("ShellService", () => {
     expect(result.output).toBe(`shell-ok\n${dir}`);
     expect(result.truncated).toBe(false);
     expect(fs.existsSync(result.info.file)).toBe(true);
-    const page = await service.output(info.id, 0, 5);
-    expect(page.output).toBe("shell");
-    expect(page.size).toBeGreaterThan(5);
+    expect(fs.readFileSync(result.info.file, "utf8")).toBe(`shell-ok\n${dir}\n`);
   });
 
   it("reports a nonzero exit", async () => {
@@ -131,14 +129,65 @@ describe("ShellService", () => {
     expect(events).toEqual([{ id: info.id, status: "exited" }]);
   });
 
-  it("lists running shells and removes finished ones", async () => {
+  it("stops a running shell with a kill signal", async () => {
     const service = makeService();
     const dir = makeTempDir("crow-shell-run-");
     const info = await service.run("sleep 30", { cwd: dir });
-    expect(service.list().map((item) => item.id)).toContain(info.id);
-    await service.remove(info.id);
-    expect(service.get(info.id)).toBeUndefined();
-    expect(service.list()).toEqual([]);
-    expect(fs.existsSync(info.file)).toBe(false);
+    service.stop(info.id);
+    const result = await service.result(info.id);
+    expect(result.info.status).toBe("killed");
+    expect(result.info.signal).toBe("SIGTERM");
+  });
+});
+
+describe("shell selection", () => {
+  it("uses PowerShell arguments for pwsh", () => {
+    expect(shellArgs("pwsh", "Get-ChildItem")).toEqual([
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "Get-ChildItem",
+    ]);
+    expect(shellArgs("/usr/bin/powershell", "ls")).toEqual([
+      "-NoLogo",
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      "ls",
+    ]);
+    expect(shellArgs("cmd", "dir")).toEqual(["/c", "dir"]);
+    expect(shellArgs("/bin/bash", "ls")).toEqual(["-c", "ls"]);
+  });
+
+  it("prefers a configured shell over $SHELL", async () => {
+    const bin = makeTempDir("crow-shell-bin-");
+    const link = path.join(bin, "myshell");
+    fs.symlinkSync("/bin/bash", link);
+    const previous = process.env.SHELL;
+    process.env.SHELL = "/bin/sh";
+    try {
+      expect(resolveShell(link)).toBe(link);
+      const service = new ShellService(makeTempDir("crow-shell-svc-"), link);
+      services.push(service);
+      const dir = makeTempDir("crow-shell-run-");
+      const info = await service.run("echo configured-ok", { cwd: dir });
+      expect(info.shell).toBe(link);
+      const result = await service.result(info.id);
+      expect(result.info.exit).toBe(0);
+      expect(result.output).toBe("configured-ok");
+    } finally {
+      if (previous === undefined) delete process.env.SHELL;
+      else process.env.SHELL = previous;
+    }
+  });
+
+  it("never resolves a denied shell, even when configured", () => {
+    const bin = makeTempDir("crow-shell-bin-");
+    const fake = path.join(bin, "fish");
+    fs.writeFileSync(fake, "#!/bin/sh\necho fake\n");
+    fs.chmodSync(fake, 0o755);
+    expect(resolveShell(fake)).not.toBe(fake);
+    expect(resolveShell("fish")).not.toBe("fish");
   });
 });

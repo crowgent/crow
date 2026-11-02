@@ -104,32 +104,6 @@ export class BashTool {
     }
   }
 
-  async executeIn(command: string, cwd: string, timeout = 120_000, abortSignal?: AbortSignal): Promise<ToolResult> {
-    const target = path.resolve(this.cwd, cwd);
-    try {
-      const info = await stat(target);
-      if (!info.isDirectory()) {
-        return { success: false, error: `Working directory is not a directory: ${target}` };
-      }
-    } catch {
-      return { success: false, error: `Working directory does not exist: ${target}` };
-    }
-    if (abortSignal?.aborted) {
-      return { success: false, error: "[Cancelled]" };
-    }
-    const previous = this.cwd;
-    this.cwd = target;
-    try {
-      const prepared = this.prepareCommand(command);
-      if (!prepared.ok) {
-        return { success: false, error: prepared.error };
-      }
-      return await this.runExec(prepared.command, timeout, abortSignal);
-    } finally {
-      this.cwd = previous;
-    }
-  }
-
   private runExec(command: string, timeout: number, abortSignal?: AbortSignal): Promise<ToolResult> {
     return new Promise<ToolResult>((resolve) => {
       let settled = false;

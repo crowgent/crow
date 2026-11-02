@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { withPermissionGate } from "../../src/crow/permission-gate";
+import { GATED_TOOLS, withPermissionGate } from "../../src/crow/permission-gate";
 import type { PermissionEffect } from "../../src/crow/permissions";
 
 function gatedTools(
@@ -75,5 +75,13 @@ describe("withPermissionGate", () => {
       { action: "bash", resource: "rm -rf /", toolName: "bash" },
     ]);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("shell permission resource", () => {
+  it("classifies scanned commands for the gate", () => {
+    expect(GATED_TOOLS.shell({ command: "git status && npm test" })).toBe("git, npm");
+    expect(GATED_TOOLS.shell({ command: "echo $(whoami)" })).toBe("echo $(whoami)");
+    expect(GATED_TOOLS.shell({ command: "FOO=1 sudo apt update" })).toBe("apt");
   });
 });

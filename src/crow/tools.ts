@@ -25,7 +25,7 @@ import {
 import { editFile, readFile, writeFile } from "../tools/file";
 import { executeGrep } from "../tools/grep";
 import type { ScheduleDaemonStatus, ScheduleManager, StoredSchedule } from "../tools/schedule";
-import { type ShellExitEvent, type ShellInfo, ShellService } from "../tools/shell";
+import { type ShellExitEvent, type ShellInfo, type ShellResult, ShellService } from "../tools/shell";
 import { createSnapshot, listSnapshots, revertSnapshot } from "../tools/snapshot";
 import { createWorktree, listWorktrees, removeWorktree } from "../tools/worktree";
 import type { AgentMode, SubagentRequest, ToolResult } from "../types/index";
@@ -79,6 +79,8 @@ export function createTools(
   options: CreateToolsOptions = {},
 ) {
   const cwd = () => bash.getCwd();
+  const shellService = options.shell ?? new ShellService(options.shellOutputDir);
+  const shellName = path.basename(shellService.getResolvedShell());
 
   const runResponsesSearch = async (
     query: string,
@@ -161,8 +163,7 @@ export function createTools(
     }),
 
     shell: tool({
-      description:
-        "Execute a shell command and return its output. Commands run on Linux using the configured shell. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately with a shell ID and stream output to a file, and the session is notified when they complete.",
+      description: `Execute a shell command and return its output. Commands run on Linux using ${shellName}. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately with a shell ID and stream output to a file, and the session is notified when they complete.`,
       inputSchema: z.object({
         command: z.string().describe("Shell command string to execute"),
         workdir: z
@@ -181,7 +182,7 @@ export function createTools(
           .boolean()
           .optional()
           .describe(
-            "Run the command in the background and return immediately (useful for dev servers and long-running builds). You do not need to use '&' at the end of the command when using this parameter. Output streams to a file and the session is notified when it completes.",
+            "Run the command in the background and return immediately (useful for dev servers and long-running builds). You do not need to use '&' at the end of the command when using this parameter. Output streams to a file and the session is notified when it completes. DO NOT poll for completion.",
           ),
       }),
       execute: async ({ command, workdir, timeout, background }, { abortSignal }) => {
@@ -191,7 +192,6 @@ export function createTools(
           const reason = preResult.blockingErrors.map((e) => e.stderr).join("; ") || "Blocked by hook";
           return { success: false, output: `[Hook blocked] ${reason}` };
         }
-        const service = options.shell ?? new ShellService(options.shellOutputDir);
         const runCwd = workdir ? path.resolve(cwd(), workdir) : cwd();
         const onExit = background
           ? (event: ShellExitEvent) => {
@@ -211,7 +211,7 @@ export function createTools(
           : undefined;
         let started: ShellInfo;
         try {
-          started = await service.run(command, {
+          started = await shellService.run(command, {
             cwd: runCwd,
             timeout: background ? (timeout ?? 0) : (timeout ?? 120_000),
             sessionId: options.sessionId,
@@ -229,7 +229,7 @@ export function createTools(
             output: [
               `Command moved to the background (shell ID: ${started.id}).`,
               `Output is streaming to: ${started.file}`,
-              `The session will be notified when it completes.`,
+              `The session will be notified when it completes. DO NOT poll for completion.`,
               ...(started.pid ? [`Use kill ${started.pid} to terminate.`] : []),
             ].join("\n"),
             shellId: started.id,
@@ -240,10 +240,24 @@ export function createTools(
           return output;
         }
 
-        const result = await service.result(started.id);
+        const onAbort = () => {
+          shellService.stop(started.id);
+        };
+        if (abortSignal?.aborted) {
+          shellService.stop(started.id);
+        } else {
+          abortSignal?.addEventListener("abort", onAbort, { once: true });
+        }
+        let result: ShellResult;
+        try {
+          result = await shellService.result(started.id);
+        } finally {
+          abortSignal?.removeEventListener("abort", onAbort);
+        }
+        const effectiveTimeout = timeout ?? 120_000;
         const statusNotice =
           result.info.status === "timeout"
-            ? "Timed out before completion"
+            ? `Command exceeded timeout of ${effectiveTimeout} ms. Retry with a larger timeout if the command is expected to take longer.`
             : result.info.signal
               ? `Killed by ${result.info.signal}`
               : result.info.exit !== undefined && result.info.exit !== 0
