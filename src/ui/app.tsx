@@ -4493,11 +4493,11 @@ function PromptBox({
             justifyContent="space-between"
             alignItems="center"
             paddingTop={1}
-            height={1}
+            height={isProcessing ? 3 : 1}
             flexShrink={0}
           >
-            <box flexDirection="row" gap={1} alignItems="center" height={1}>
-              {isProcessing ? <PromptActivitySpinner color={modeInfo.color} /> : null}
+            <box flexDirection="row" gap={1} alignItems="center" height={isProcessing ? 3 : 1}>
+              {isProcessing ? <DotGridSpinner t={t} /> : null}
               <text fg={t.text}>{modelInfo?.name || model || "No provider selected"}</text>
               {contextStats ? <ContextMeter t={t} stats={contextStats} /> : null}
             </box>
@@ -4560,15 +4560,31 @@ function PromptModeLabel({ modeInfo }: { t: Theme; modeInfo: (typeof MODES)[numb
   );
 }
 
-const PROMPT_ACTIVITY_FRAMES = ["◐", "◓", "◑", "◒"];
-
-function PromptActivitySpinner({ color }: { color: string }) {
+function DotGridSpinner({ t }: { t: Theme }) {
   const [frame, setFrame] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setFrame((f) => (f + 1) % PROMPT_ACTIVITY_FRAMES.length), 120);
+    const id = setInterval(() => setFrame((f) => (f + 1) % 9), 120);
     return () => clearInterval(id);
   }, []);
-  return <text fg={color}>{PROMPT_ACTIVITY_FRAMES[frame]}</text>;
+  const lit = frame + 1;
+  const dot = (index: number) => (
+    <span key={index} style={{ fg: index < lit ? t.text : t.textMuted }}>
+      {"●"}
+    </span>
+  );
+  return (
+    <box flexDirection="column">
+      <text>
+        {dot(0)} {dot(1)} {dot(2)}
+      </text>
+      <text>
+        {dot(3)} {dot(4)} {dot(5)}
+      </text>
+      <text>
+        {dot(6)} {dot(7)} {dot(8)}
+      </text>
+    </box>
+  );
 }
 
 function CopyFlashBanner({ t, width }: { t: Theme; width: number }) {
