@@ -15,17 +15,21 @@ permissions:
 
 jobs:
   build:
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-latest
+            target: bun-linux-x64
             build_output: crow
             asset_name: crow-linux-x64
-          - runner: macos-latest
+          - runner: ubuntu-latest
+            target: bun-darwin-arm64
             build_output: crow
             asset_name: crow-darwin-arm64
           - runner: windows-latest
+            target: bun-windows-x64
             build_output: crow.exe
             asset_name: crow-windows-x64.exe
 
@@ -47,8 +51,18 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Fetch macOS native binding for cross-compile
+        if: matrix.asset_name == 'crow-darwin-arm64'
+        shell: bash
+        run: |
+          version=$(node -p "require('./node_modules/@opentui/core/package.json').version")
+          npm pack "@opentui/core-darwin-arm64@${version}" >/dev/null
+          mkdir -p node_modules/@opentui/core-darwin-arm64
+          tar -xzf opentui-core-darwin-arm64-*.tgz -C node_modules/@opentui/core-darwin-arm64 --strip-components=1
+          rm -f opentui-core-darwin-arm64-*.tgz
+
       - name: Compile standalone binary
-        run: bun build --compile --outfile "release/${{ matrix.build_output }}" ./src/index.ts
+        run: bun build --compile --target "${{ matrix.target }}" --outfile "release/${{ matrix.build_output }}" ./src/index.ts
 
       - name: Compute checksum (unix)
         if: runner.os != 'Windows'
