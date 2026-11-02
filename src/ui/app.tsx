@@ -50,6 +50,7 @@ import {
   fetchProviderModels,
   findProvider,
   getAllProviders,
+  mergeModelIds,
   normalizeBaseUrl,
   type ProviderDefinition,
 } from "../utils/providers";
@@ -616,6 +617,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     | "customName"
     | "customBaseUrl"
     | "customKey"
+    | "customModelSource"
     | "customModel"
     | "customModelName"
     | "customModelList"
@@ -821,7 +823,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     if (!selectedProviderId) return [];
     const custom = customProviders.find((provider) => provider.id === selectedProviderId);
     if (custom) {
-      return custom.models.map((id) => ({
+      const ids = providerFetchedModels ? mergeModelIds(custom.models, providerFetchedModels) : custom.models;
+      return ids.map((id) => ({
         id,
         name: custom.modelNames?.[id] ?? id,
         contextWindow: 128000,
@@ -1920,14 +1923,16 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   );
 
   const finishCustomProvider = useCallback(
-    (modelId: string, modelName?: string) => {
+    (modelIds: string[], defaultModelId: string, modelName?: string) => {
       const id = customDraft.id;
+      const models = [...new Set(modelIds.map((model) => model.trim()).filter((model) => model !== ""))];
+      if (models.length === 0) return;
       const custom: CustomProvider = {
         id,
         name: customDraft.name || id,
         baseUrl: normalizeBaseUrl(customDraft.baseUrl),
-        models: [modelId],
-        ...(modelName && modelName !== modelId ? { modelNames: { [modelId]: modelName } } : {}),
+        models,
+        ...(modelName && modelName !== defaultModelId ? { modelNames: { [defaultModelId]: modelName } } : {}),
       };
       const next = [...customProviders.filter((provider) => provider.id !== id), custom];
       saveCustomProviders(next);
@@ -1937,7 +1942,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       showProviderModalRef.current = false;
       setShowProviderModal(false);
       setProviderError(null);
-      applyProviderSelection(id, customDraft.apiKey, modelId);
+      applyProviderSelection(id, customDraft.apiKey, defaultModelId);
     },
     [applyProviderSelection, customDraft, customProviders],
   );
@@ -1971,8 +1976,41 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
 
   const selectCustomModel = useCallback(() => {
     const modelId = customFetchedModels[providerIndex];
-    if (modelId) finishCustomProvider(modelId);
+    if (modelId) finishCustomProvider(customFetchedModels, modelId);
   }, [customFetchedModels, finishCustomProvider, providerIndex]);
+
+  const selectModelSource = useCallback(() => {
+    if (providerIndex === 1) {
+      setProviderStep("customModel");
+      setProviderError(null);
+      providerInputRef.current?.clear();
+      return;
+    }
+    setProviderLoading(true);
+    setProviderError(null);
+    providerInputRef.current?.clear();
+    fetchProviderModels(customDraft.baseUrl, customDraft.apiKey)
+      .then((ids) => {
+        setProviderLoading(false);
+        if (ids.length > 0) {
+          setCustomFetchedModels(ids);
+          setProviderIndex(0);
+          setProviderStep("customModelList");
+        } else {
+          setProviderError(
+            "Could not load models from this base URL. Check the base URL and API key, then enter a model id manually.",
+          );
+          setProviderStep("customModel");
+        }
+      })
+      .catch(() => {
+        setProviderLoading(false);
+        setProviderError(
+          "Could not load models from this base URL. Check the base URL and API key, then enter a model id manually.",
+        );
+        setProviderStep("customModel");
+      });
+  }, [customDraft.apiKey, customDraft.baseUrl, providerIndex]);
 
   const openProviderModels = useCallback(() => {
     const selected = getSelectedProvider();
@@ -1990,10 +2028,21 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     setModelSearchQuery("");
     fetchProviderModels(selected.provider.baseUrl, selected.apiKey)
       .then((ids) => {
-        if (ids.length > 0) setProviderFetchedModels(ids);
+        if (ids.length === 0) return;
+        setProviderFetchedModels(ids);
+        const isCustom = customProviders.some((provider) => provider.id === selected.provider.id);
+        if (!isCustom) return;
+        const saved = loadCustomProviders();
+        const target = saved.find((provider) => provider.id === selected.provider.id);
+        if (!target) return;
+        const merged = mergeModelIds(target.models, ids);
+        if (merged.length === target.models.length) return;
+        const next = saved.map((provider) => (provider.id === target.id ? { ...provider, models: merged } : provider));
+        saveCustomProviders(next);
+        setCustomProviders(next);
       })
       .catch(() => {});
-  }, []);
+  }, [customProviders]);
 
   const closeProviderModal = useCallback(() => {
     showProviderModalRef.current = false;
@@ -2068,32 +2117,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         setProviderError("Enter an API key to continue.");
         return;
       }
-      const draft = { ...customDraft, apiKey: input };
-      setCustomDraft(draft);
-      setProviderLoading(true);
+      setCustomDraft((draft) => ({ ...draft, apiKey: input }));
+      setProviderStep("customModelSource");
       setProviderError(null);
+      setProviderIndex(0);
       providerInputRef.current?.clear();
-      fetchProviderModels(draft.baseUrl, input)
-        .then((ids) => {
-          setProviderLoading(false);
-          if (ids.length > 0) {
-            setCustomFetchedModels(ids);
-            setProviderIndex(0);
-            setProviderStep("customModelList");
-          } else {
-            setProviderError(
-              "Could not load models from this base URL. Check the base URL and API key, then enter a model id manually.",
-            );
-            setProviderStep("customModel");
-          }
-        })
-        .catch(() => {
-          setProviderLoading(false);
-          setProviderError(
-            "Could not load models from this base URL. Check the base URL and API key, then enter a model id manually.",
-          );
-          setProviderStep("customModel");
-        });
       return;
     }
     if (providerStep === "customModel") {
@@ -2108,7 +2136,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       return;
     }
     if (providerStep === "customModelName") {
-      finishCustomProvider(customDraft.modelId, input || customDraft.modelId);
+      finishCustomProvider([customDraft.modelId], customDraft.modelId, input || customDraft.modelId);
       return;
     }
   }, [applyProviderSelection, customDraft, customProviders, finishCustomProvider, providerSelectedId, providerStep]);
@@ -3401,6 +3429,21 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           }
           return;
         }
+        if (providerStep === "customModelSource") {
+          if (key.name === "up") {
+            setProviderIndex((i) => wrapListIndex(i, CUSTOM_MODEL_SOURCE_OPTIONS.length, -1));
+            return;
+          }
+          if (key.name === "down") {
+            setProviderIndex((i) => wrapListIndex(i, CUSTOM_MODEL_SOURCE_OPTIONS.length, 1));
+            return;
+          }
+          if (key.name === "return") {
+            selectModelSource();
+            return;
+          }
+          return;
+        }
         if (key.name === "return") {
           submitProviderStep();
         }
@@ -3768,6 +3811,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       providerRows,
       providerStep,
       selectCustomModel,
+      selectModelSource,
       selectProviderRow,
       connectModalIndex,
       cycleMode,
@@ -4557,6 +4601,8 @@ function CopyFlashBanner({ t, width }: { t: Theme; width: number }) {
   );
 }
 
+const CUSTOM_MODEL_SOURCE_OPTIONS = ["Fetch all models from base URL", "Enter model id manually"];
+
 function ProviderConnectModal({
   t,
   width,
@@ -4585,6 +4631,7 @@ function ProviderConnectModal({
     | "customName"
     | "customBaseUrl"
     | "customKey"
+    | "customModelSource"
     | "customModel"
     | "customModelName"
     | "customModelList";
@@ -4601,9 +4648,13 @@ function ProviderConnectModal({
     listRef.current?.scrollChildIntoView(`provider-${providerIndex}`);
   }, [providerIndex]);
   const panelWidth = Math.min(68, width - 6);
-  const isList = step === "list" || step === "customModelList";
+  const isList = step === "list" || step === "customModelList" || step === "customModelSource";
   const listItems =
-    step === "list" ? [...providers.map((provider) => provider.name), "Add custom provider..."] : customModels;
+    step === "list"
+      ? [...providers.map((provider) => provider.name), "Add custom provider..."]
+      : step === "customModelSource"
+        ? CUSTOM_MODEL_SOURCE_OPTIONS
+        : customModels;
   const panelHeight = isList ? Math.min(listItems.length + 7, Math.floor(height * 0.7)) : 13;
   const top = bottomAlignedModalTop(height, panelHeight);
   const title =
@@ -4619,11 +4670,13 @@ function ProviderConnectModal({
               ? "Custom provider base URL"
               : step === "customKey"
                 ? `API key for ${customDraftName}`
-                : step === "customModel"
-                  ? `Model id for ${customDraftName}`
-                  : step === "customModelName"
-                    ? `Model name for ${customDraftName}`
-                    : `Pick a model for ${customDraftName}`;
+                : step === "customModelSource"
+                  ? `Models for ${customDraftName}`
+                  : step === "customModel"
+                    ? `Model id for ${customDraftName}`
+                    : step === "customModelName"
+                      ? `Model name for ${customDraftName}`
+                      : `Pick a model for ${customDraftName}`;
   const prompt =
     step === "list"
       ? "Pick a provider. If it already has a saved key, it connects right away."
@@ -4637,11 +4690,13 @@ function ProviderConnectModal({
               ? "Base URL of the OpenAI-compatible API, for example https://example.com/v1."
               : step === "customKey"
                 ? "Paste the API key for this provider."
-                : step === "customModel"
-                  ? "Models could not be fetched from this base URL. Type a model id instead."
-                  : step === "customModelName"
-                    ? "Display name for this model. Leave empty to use the model id."
-                    : "Models fetched from this base URL. Pick one.";
+                : step === "customModelSource"
+                  ? "Fetch every model from this base URL, or enter one model id manually."
+                  : step === "customModel"
+                    ? "Models could not be fetched from this base URL. Type a model id instead."
+                    : step === "customModelName"
+                      ? "Display name for this model. Leave empty to use the model id."
+                      : "Models fetched from this base URL. Pick the default model. Every fetched model will be saved.";
   const placeholder =
     step === "key" || step === "customKey"
       ? "sk-..."

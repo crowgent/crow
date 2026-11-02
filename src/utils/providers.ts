@@ -10908,6 +10908,19 @@ export function parseModelsResponse(payload: unknown): string[] {
   return [...new Set(ids)].sort();
 }
 
+export function mergeModelIds(saved: string[], fetched: string[]): string[] {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const id of [...saved, ...fetched]) {
+    const trimmed = id.trim();
+    if (trimmed !== "" && !seen.has(trimmed)) {
+      seen.add(trimmed);
+      merged.push(trimmed);
+    }
+  }
+  return merged;
+}
+
 export async function fetchProviderModels(baseUrl: string, apiKey: string, signal?: AbortSignal): Promise<string[]> {
   const url = `${normalizeBaseUrl(baseUrl)}/models`;
   const response = await fetch(url, {
