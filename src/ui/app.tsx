@@ -16,6 +16,11 @@ import {
 } from "../crow/models";
 import { parseEnvLines, parseHeaderLines } from "../mcp/parse-headers";
 import { toMcpServerId, validateMcpServerConfig } from "../mcp/validate";
+import {
+  isTelegramBridgeRunning,
+  spawnDetachedTelegramBridge,
+  stopDetachedTelegramBridge,
+} from "../telegram/background";
 import { createTelegramBridge, type TelegramBridgeHandle } from "../telegram/bridge";
 import { approvePairingCode } from "../telegram/pairing";
 import { createTurnCoordinator } from "../telegram/turn-coordinator";
@@ -247,6 +252,7 @@ const BUILTIN_TYPED_SLASH_COMMANDS = new Set([
   "/recap",
   "/recaps",
   "/remote-control",
+  "/disconnect",
   "/mcp",
   "/mcps",
   "/agents",
@@ -1824,10 +1830,30 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     [appendLiveToolResult, beginLiveTurn, getTelegramAgent],
   );
 
+  const disconnectTelegramBridge = useCallback(async () => {
+    const inProcess = bridgeRef.current;
+    bridgeRef.current = null;
+    let stopped = false;
+    if (inProcess) {
+      await inProcess.stop().catch(() => {});
+      stopped = true;
+    }
+    if (await stopDetachedTelegramBridge()) {
+      stopped = true;
+    }
+    saveUserSettings({ telegram: { ...loadUserSettings().telegram, bridgeDisabled: true } });
+    setMessages((p) => [
+      ...p,
+      buildAssistantEntry(stopped ? "Telegram bridge disconnected." : "Telegram bridge is not running."),
+    ]);
+  }, []);
+
   const startTelegramBridge = useCallback(() => {
     const token = getTelegramBotToken();
     if (!token || !getSelectedProvider()) return;
+    if (loadUserSettings().telegram?.bridgeDisabled) return;
     if (bridgeRef.current) return;
+    if (isTelegramBridgeRunning()) return;
 
     const bridge = createTelegramBridge({
       token,
@@ -1841,12 +1867,16 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       onError: (msg) => {
         setMessages((p) => [...p, { type: "assistant", content: `Telegram: ${msg}`, timestamp: new Date() }]);
       },
+      onDisconnect: () => {
+        void disconnectTelegramBridge();
+      },
     });
     bridgeRef.current = bridge;
     bridge.start();
   }, [
     appendTelegramToolResult,
     appendTelegramUserMessage,
+    disconnectTelegramBridge,
     getTelegramAgent,
     showTelegramToolCalls,
     upsertTelegramAssistantMessage,
@@ -1860,9 +1890,17 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   }, [hasApiKey, startTelegramBridge]);
 
   const handleExit = useCallback(() => {
-    void bridgeRef.current?.stop();
+    const bridge = bridgeRef.current;
     bridgeRef.current = null;
-    onExit?.();
+    void (async () => {
+      if (bridge) {
+        await bridge.stop().catch(() => {});
+      }
+      if (!loadUserSettings().telegram?.bridgeDisabled) {
+        spawnDetachedTelegramBridge();
+      }
+      onExit?.();
+    })();
   }, [onExit]);
 
   const showCopyBanner = useCallback(() => {
@@ -2207,7 +2245,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       return;
     }
     const u = loadUserSettings();
-    saveUserSettings({ telegram: { ...u.telegram, botToken: token } });
+    saveUserSettings({ telegram: { ...u.telegram, botToken: token, bridgeDisabled: false } });
     telegramTokenInputRef.current?.clear();
     setShowTelegramTokenModal(false);
     setTelegramTokenError(null);
@@ -2614,6 +2652,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         setShowConnectModal(true);
         return true;
       }
+      if (c === "/disconnect") {
+        void disconnectTelegramBridge();
+        return true;
+      }
       if (c === "/mcp" || c === "/mcps") {
         openMcpModal();
         return true;
@@ -2825,6 +2867,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       agent,
       agentDefinitions,
       clearLiveTurnUi,
+      disconnectTelegramBridge,
       handleExit,
       openAgentsModal,
       openMcpModal,
@@ -2862,6 +2905,9 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         case "remote-control":
           setConnectModalIndex(0);
           setShowConnectModal(true);
+          break;
+        case "disconnect":
+          void disconnectTelegramBridge();
           break;
         case "exit":
           handleExit();
@@ -2913,6 +2959,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     },
     [
       agent,
+      disconnectTelegramBridge,
       handleExit,
       openAgentsModal,
       openMcpModal,

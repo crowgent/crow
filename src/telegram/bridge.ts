@@ -24,6 +24,7 @@ export interface TelegramBridgeOptions {
   onToolCalls?: (event: { turnKey: string; userId: number; toolCalls: ToolCall[] }) => void;
   onToolResult?: (event: { turnKey: string; userId: number; toolCall: ToolCall; toolResult: ToolResult }) => void;
   onError?: (message: string) => void;
+  onDisconnect?: () => void;
 }
 
 export interface TelegramBridgeHandle {
@@ -304,6 +305,13 @@ export function createTelegramBridge(opts: TelegramBridgeOptions): TelegramBridg
     if (userId === undefined) return;
     const code = registerPairingCode(userId);
     await ctx.reply(`Your pairing code: ${code}\nEnter this code in Crow (/remote-control → Telegram) to approve.`);
+  });
+
+  bot.command("disconnect", async (ctx) => {
+    const userId = await ensureApprovedUser(ctx);
+    if (userId === null) return;
+    await ctx.reply("Telegram bridge disconnected.");
+    opts.onDisconnect?.();
   });
 
   bot.on("message:text", async (ctx) => {

@@ -98,4 +98,64 @@ describe("createTelegramBridge", () => {
       expect(mockSendMessage).toHaveBeenCalledWith(123, "a".repeat(4096));
     });
   });
+
+  describe("disconnect command", () => {
+    beforeEach(() => {
+      mockSendMessage = vi.fn().mockResolvedValue(undefined);
+      MockedBot.mockImplementation(function BotMock() {
+        return {
+          api: { sendMessage: mockSendMessage },
+          start: vi.fn(),
+          stop: vi.fn(),
+          catch: vi.fn(),
+          command: vi.fn(),
+          on: vi.fn(),
+        } as never;
+      } as never);
+    });
+
+    function getDisconnectHandler() {
+      const results = MockedBot.mock.results;
+      const botInstance = results[results.length - 1].value as unknown as {
+        command: ReturnType<typeof vi.fn>;
+      };
+      const call = botInstance.command.mock.calls.find(([name]) => name === "disconnect");
+      expect(call).toBeDefined();
+      return call?.[1] as (ctx: { from?: { id?: number }; reply: (text: string) => Promise<unknown> }) => Promise<void>;
+    }
+
+    it("replies and calls onDisconnect for an approved user", async () => {
+      const onDisconnect = vi.fn();
+      createTelegramBridge({
+        token: "test-token",
+        getApprovedUserIds: () => [123],
+        coordinator: mockCoordinator(),
+        getTelegramAgent: vi.fn(),
+        onDisconnect,
+      });
+
+      const reply = vi.fn().mockResolvedValue(undefined);
+      await getDisconnectHandler()({ from: { id: 123 }, reply });
+
+      expect(reply).toHaveBeenCalledWith("Telegram bridge disconnected.");
+      expect(onDisconnect).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not call onDisconnect for an unapproved user", async () => {
+      const onDisconnect = vi.fn();
+      createTelegramBridge({
+        token: "test-token",
+        getApprovedUserIds: () => [123],
+        coordinator: mockCoordinator(),
+        getTelegramAgent: vi.fn(),
+        onDisconnect,
+      });
+
+      const reply = vi.fn().mockResolvedValue(undefined);
+      await getDisconnectHandler()({ from: { id: 999 }, reply });
+
+      expect(reply).toHaveBeenCalledWith("Not paired yet. Send /pair to get a code, then approve in Crow.");
+      expect(onDisconnect).not.toHaveBeenCalled();
+    });
+  });
 });

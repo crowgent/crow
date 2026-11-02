@@ -58,6 +58,7 @@ export interface TelegramSettings {
   typingIndicator?: boolean;
   /** Reserved: Bot API `sendMessageDraft` for private DMs (not implemented yet). */
   nativeDrafts?: boolean;
+  bridgeDisabled?: boolean;
 }
 
 export type McpRemoteTransport = "http" | "sse";

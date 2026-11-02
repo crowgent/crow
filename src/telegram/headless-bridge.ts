@@ -16,6 +16,7 @@ import {
   saveApprovedTelegramUserId,
   saveUserSettings,
 } from "../utils/settings";
+import { removeTelegramBridgePid, writeTelegramBridgePid } from "./background";
 import { createTelegramBridge } from "./bridge";
 import {
   resolveTelegramHeadlessBridgePaths,
@@ -132,6 +133,8 @@ export async function runTelegramHeadlessBridge(options: TelegramHeadlessBridgeO
     throw new Error("No provider selected. Use /connect in the TUI to choose a provider first.");
   }
 
+  writeTelegramBridgePid(process.pid);
+
   const startupConfig: TelegramHeadlessStartupConfig = {
     apiKey,
     providerId: getSelectedProviderId(),
@@ -173,6 +176,15 @@ export async function runTelegramHeadlessBridge(options: TelegramHeadlessBridgeO
     },
     onError: (message) => {
       appendLog(paths.logFile, `bridge_error: ${message}`);
+    },
+    onDisconnect: () => {
+      saveUserSettings({
+        telegram: {
+          ...loadUserSettings().telegram,
+          bridgeDisabled: true,
+        },
+      });
+      void stop("disconnect");
     },
   });
 
@@ -226,6 +238,7 @@ export async function runTelegramHeadlessBridge(options: TelegramHeadlessBridgeO
     const bot = await fetchBotIdentity(token, startupAbortController.signal);
     if (stopping) {
       await shutdownComplete;
+      removeTelegramBridgePid();
       return;
     }
 
@@ -272,9 +285,11 @@ export async function runTelegramHeadlessBridge(options: TelegramHeadlessBridgeO
           );
         });
       }
+      removeTelegramBridgePid();
       throw error;
     }
 
     await shutdownComplete;
   }
+  removeTelegramBridgePid();
 }

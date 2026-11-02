@@ -8,6 +8,7 @@ export interface SlashMenuItem {
 export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "exit", label: "exit", description: "Quit the CLI" },
   { id: "remote-control", label: "remote-control", description: "Remote control" },
+  { id: "disconnect", label: "disconnect", description: "Disconnect Telegram bridge" },
   { id: "agents", label: "agents", description: "Manage custom sub-agents" },
   { id: "schedule", label: "schedule", description: "View scheduled runs" },
   { id: "mcp", label: "mcp", description: "Manage MCP servers" },
