@@ -5549,13 +5549,22 @@ function truncateBlock(text: string, maxLines: number): string {
 }
 
 function ToolOutputView({ t, content }: { t: Theme; content: string }) {
+  const [expanded, setExpanded] = useState(false);
   const lines = content.split("\n");
-  const shown = lines.slice(0, 30);
+  const shown = expanded ? lines : lines.slice(0, 30);
   const extra = lines.length - shown.length;
   return (
-    <box paddingLeft={5} marginTop={1} flexShrink={0} flexDirection="column">
+    // biome-ignore lint/a11y/noStaticElementInteractions: click expands or collapses the tool output
+    <box
+      paddingLeft={5}
+      marginTop={1}
+      flexShrink={0}
+      flexDirection="column"
+      onMouseUp={extra > 0 || expanded ? () => setExpanded((value) => !value) : undefined}
+    >
       <text fg={t.textMuted}>{shown.join("\n")}</text>
-      {extra > 0 && <text fg={t.textDim}>… {extra} more lines not shown</text>}
+      {extra > 0 && <text fg={t.textDim}>… {extra} more lines not shown · click to expand</text>}
+      {expanded && <text fg={t.textDim}>· click to collapse</text>}
     </box>
   );
 }
