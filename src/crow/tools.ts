@@ -25,6 +25,7 @@ import {
 import { editFile, readFile, writeFile } from "../tools/file";
 import { executeGrep } from "../tools/grep";
 import type { ScheduleDaemonStatus, ScheduleManager, StoredSchedule } from "../tools/schedule";
+import { type ShellExitEvent, type ShellInfo, ShellService } from "../tools/shell";
 import { createSnapshot, listSnapshots, revertSnapshot } from "../tools/snapshot";
 import { createWorktree, listWorktrees, removeWorktree } from "../tools/worktree";
 import type { AgentMode, SubagentRequest, ToolResult } from "../types/index";
@@ -66,6 +67,9 @@ interface CreateToolsOptions {
   sessionId?: string;
   askQuestion?: QuestionResolver;
   todos?: TodoStore;
+  shell?: ShellService;
+  shellOutputDir?: string;
+  onShellExit?: (note: string) => void;
 }
 
 export function createTools(
@@ -158,7 +162,7 @@ export function createTools(
 
     shell: tool({
       description:
-        "Execute a shell command and return its output. Commands run on Linux using sh. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately with a shell ID and stream output to a file; use process_logs to read it.",
+        "Execute a shell command and return its output. Commands run on Linux using the configured shell. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately with a shell ID and stream output to a file, and the session is notified when they complete.",
       inputSchema: z.object({
         command: z.string().describe("Shell command string to execute"),
         workdir: z
@@ -177,7 +181,7 @@ export function createTools(
           .boolean()
           .optional()
           .describe(
-            "Run the command in the background and return immediately (useful for dev servers and long-running builds). You do not need to use '&' at the end of the command when using this parameter. Output streams to a file; read it with process_logs.",
+            "Run the command in the background and return immediately (useful for dev servers and long-running builds). You do not need to use '&' at the end of the command when using this parameter. Output streams to a file and the session is notified when it completes.",
           ),
       }),
       execute: async ({ command, workdir, timeout, background }, { abortSignal }) => {
@@ -187,52 +191,81 @@ export function createTools(
           const reason = preResult.blockingErrors.map((e) => e.stderr).join("; ") || "Blocked by hook";
           return { success: false, output: `[Hook blocked] ${reason}` };
         }
+        const service = options.shell ?? new ShellService(options.shellOutputDir);
+        const runCwd = workdir ? path.resolve(cwd(), workdir) : cwd();
+        const onExit = background
+          ? (event: ShellExitEvent) => {
+              if (!options.onShellExit) return;
+              const tail = event.result.output.length > 4000 ? event.result.output.slice(-4000) : event.result.output;
+              const state = event.info.status === "exited" && event.info.exit === 0 ? "completed" : event.info.status;
+              const shortCommand =
+                event.info.command.length > 80 ? `${event.info.command.slice(0, 79)}…` : event.info.command;
+              options.onShellExit(
+                [
+                  `Background shell ${event.info.id} ${state} (command: ${shortCommand}).`,
+                  tail,
+                  `Full output: ${event.info.file}`,
+                ].join("\n"),
+              );
+            }
+          : undefined;
+        let started: ShellInfo;
+        try {
+          started = await service.run(command, {
+            cwd: runCwd,
+            timeout: background ? (timeout ?? 0) : (timeout ?? 120_000),
+            sessionId: options.sessionId,
+            onExit,
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          executePostToolFailureHooks("shell", toolInput, msg, cwd(), options.sessionId, abortSignal).catch(() => {});
+          return { success: false, output: msg };
+        }
 
         if (background) {
-          const started = await bash.startBackground(command, workdir);
-          if (!started.success || !started.backgroundProcess) {
-            executePostToolFailureHooks(
-              "shell",
-              toolInput,
-              started.output || "Failed to start background command",
-              cwd(),
-              options.sessionId,
-              abortSignal,
-            ).catch(() => {});
-            return { success: false, output: started.output || "Failed to start background command" };
-          }
-          const info = started.backgroundProcess;
           const output = {
             success: true,
             output: [
-              `Command moved to the background (shell ID: ${info.id}).`,
-              ...(info.logPath ? [`Output is streaming to: ${info.logPath}`] : []),
-              `Use process_logs(${info.id}) to view output, process_stop(${info.id}) to terminate.`,
+              `Command moved to the background (shell ID: ${started.id}).`,
+              `Output is streaming to: ${started.file}`,
+              `The session will be notified when it completes.`,
+              ...(started.pid ? [`Use kill ${started.pid} to terminate.`] : []),
             ].join("\n"),
+            shellId: started.id,
+            file: started.file,
+            pid: started.pid,
           };
           executePostToolHooks("shell", toolInput, output, cwd(), options.sessionId, abortSignal).catch(() => {});
           return output;
         }
 
-        const result = await bash.executeIn(command, workdir ?? cwd(), timeout ?? 120_000, abortSignal);
+        const result = await service.result(started.id);
+        const statusNotice =
+          result.info.status === "timeout"
+            ? "Timed out before completion"
+            : result.info.signal
+              ? `Killed by ${result.info.signal}`
+              : result.info.exit !== undefined && result.info.exit !== 0
+                ? `Exited with code ${result.info.exit}`
+                : undefined;
         const output = {
-          success: result.success,
-          output: result.success
-            ? result.output || "Command executed successfully (no output)"
-            : result.error || "Command failed",
+          success: result.info.status === "exited" && result.info.exit === 0,
+          output: statusNotice ? `${result.output}\n\n${statusNotice}` : result.output,
+          exit: result.info.exit,
+          signal: result.info.signal,
+          timeout: result.info.status === "timeout",
+          truncated: result.truncated,
+          file: result.info.file,
+          shellId: result.info.id,
         };
 
-        if (result.success) {
+        if (output.success) {
           executePostToolHooks("shell", toolInput, output, cwd(), options.sessionId, abortSignal).catch(() => {});
         } else {
-          executePostToolFailureHooks(
-            "shell",
-            toolInput,
-            result.error || "Command failed",
-            cwd(),
-            options.sessionId,
-            abortSignal,
-          ).catch(() => {});
+          executePostToolFailureHooks("shell", toolInput, output.output, cwd(), options.sessionId, abortSignal).catch(
+            () => {},
+          );
         }
 
         return output;

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { createTools } from "../../src/crow/tools";
 import { BashTool } from "../../src/tools/bash";
+import { ShellService } from "../../src/tools/shell";
 
 function createScheduleToolSet(overrides?: {
   getDaemonStatus?: () => Promise<{ running: boolean; pid: number | null }>;
@@ -290,7 +291,7 @@ describe("schedule daemon tools", () => {
 });
 
 describe("shell tool", () => {
-  it("exposes an opencode-style shell with background streaming", () => {
+  it("exposes a shell with background streaming", () => {
     const tools = createTools(new BashTool("/tmp"), {} as never, "agent");
     const shellTool = tools.shell as { description?: string };
 
@@ -300,28 +301,31 @@ describe("shell tool", () => {
   });
 
   it("runs a command in the given workdir", async () => {
-    const tools = createTools(new BashTool("/tmp"), {} as never, "agent") as Record<
-      string,
-      { execute: (input: unknown, context?: unknown) => Promise<unknown> }
-    >;
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
+      shell: new ShellService(await mkdtemp(join(tmpdir(), "crow-shell-out-"))),
+    }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown> }>;
     const dir = await mkdtemp(join(tmpdir(), "crow-shell-test-"));
 
     try {
       const result = (await tools.shell.execute({ command: "pwd", workdir: dir }, {})) as {
         success: boolean;
         output: string;
+        exit: number;
+        shellId: string;
       };
-      expect(result).toEqual({ success: true, output: dir });
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(dir);
+      expect(result.exit).toBe(0);
+      expect(typeof result.shellId).toBe("string");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
   });
 
   it("returns a shell ID and log file for background commands", async () => {
-    const tools = createTools(new BashTool("/tmp"), {} as never, "agent") as Record<
-      string,
-      { execute: (input: unknown, context?: unknown) => Promise<unknown> }
-    >;
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
+      shell: new ShellService(await mkdtemp(join(tmpdir(), "crow-shell-out-"))),
+    }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown> }>;
     const result = (await tools.shell.execute({ command: "echo shell-bg-ok", background: true }, {})) as {
       success: boolean;
       output: string;
@@ -329,6 +333,20 @@ describe("shell tool", () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain("shell ID");
     expect(result.output).toContain("streaming to");
-    expect(result.output).toContain("process_logs");
+    expect(result.output).toContain("notified");
+  });
+
+  it("reports a nonzero exit with its code", async () => {
+    const tools = createTools(new BashTool("/tmp"), {} as never, "agent", {
+      shell: new ShellService(await mkdtemp(join(tmpdir(), "crow-shell-out-"))),
+    }) as Record<string, { execute: (input: unknown, context?: unknown) => Promise<unknown> }>;
+    const result = (await tools.shell.execute({ command: "exit 3" }, {})) as {
+      success: boolean;
+      output: string;
+      exit: number;
+    };
+    expect(result.success).toBe(false);
+    expect(result.exit).toBe(3);
+    expect(result.output).toContain("Exited with code 3");
   });
 });

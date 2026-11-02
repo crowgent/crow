@@ -24,8 +24,20 @@ describe("matchGlob", () => {
 });
 
 describe("evaluatePermission", () => {
-  it("defaults to ask with no matching rule", () => {
-    expect(evaluatePermission([], "bash", "ls")).toBe("ask");
+  it("defaults shell and bash to allow with no matching rule", () => {
+    expect(evaluatePermission([], "bash", "ls")).toBe("allow");
+    expect(evaluatePermission([], "shell", "ls")).toBe("allow");
+  });
+
+  it("defaults other tools to ask with no matching rule", () => {
+    expect(evaluatePermission([], "edit_file", "a.txt")).toBe("ask");
+    expect(evaluatePermission([], "write_file", "a.txt")).toBe("ask");
+  });
+
+  it("lets an explicit rule override the shell default", () => {
+    const rules = [{ action: "shell", resource: "*", effect: "deny" as const }];
+    expect(evaluatePermission(rules, "shell", "ls")).toBe("deny");
+    expect(evaluatePermission(rules, "bash", "ls")).toBe("allow");
   });
 
   it("applies the last matching rule", () => {
@@ -55,13 +67,18 @@ describe("permission file roundtrip", () => {
     expect(loadPermissionRules(path.join(dir, "missing.json"))).toEqual([]);
   });
 
-  it("store appends rules and persists them", () => {
+  it("store seeds shell defaults and appends rules", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "crow-perm-"));
     const file = path.join(dir, "permissions.json");
     const store = new PermissionStore(file);
-    expect(store.evaluate("bash", "ls")).toBe("ask");
+    expect(store.evaluate("bash", "ls")).toBe("allow");
+    expect(store.evaluate("edit_file", "a.txt")).toBe("ask");
     store.addRule({ action: "bash", resource: "ls", effect: "allow" });
     expect(store.evaluate("bash", "ls")).toBe("allow");
-    expect(loadPermissionRules(file)).toEqual([{ action: "bash", resource: "ls", effect: "allow" }]);
+    expect(loadPermissionRules(file)).toEqual([
+      { action: "shell", resource: "*", effect: "allow" },
+      { action: "bash", resource: "*", effect: "allow" },
+      { action: "bash", resource: "ls", effect: "allow" },
+    ]);
   });
 });

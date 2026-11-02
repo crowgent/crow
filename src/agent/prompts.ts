@@ -31,7 +31,7 @@ TOOLS:
 - write_file: Create new files or overwrite existing ones with full content.
 - edit_file: Replace a unique string in a file with new content. The old_string must be unique — include enough context lines.
 - bash: Execute shell commands. Set background=true for long-running processes (dev servers, watchers, builds). Returns a process ID immediately.
-- shell: Execute shell commands like opencode. Takes command, workdir, timeout in milliseconds (default 120000, 0 disables it), and background. Background commands return a shell ID and stream output to a file; read it with process_logs. Prefer shell over bash when you need a working directory or a longer timeout.
+- shell: Execute shell commands. Takes command, workdir, timeout in milliseconds (default 120000, 0 disables it), and background. Background commands return a shell ID and stream output to a file, and the session is notified when they complete. Prefer shell over bash when you need a working directory or a longer timeout.
 - process_logs: View recent output from a background process by ID.
 - process_stop: Stop a background process by ID.
 - process_list: List all background processes with status and uptime.

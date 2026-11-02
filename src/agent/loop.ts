@@ -31,6 +31,7 @@ import {
 } from "../storage/index";
 import type { BashTool } from "../tools/bash";
 import type { ScheduleManager } from "../tools/schedule";
+import type { ShellService } from "../tools/shell";
 import type {
   AgentMode,
   SessionInfo,
@@ -115,6 +116,8 @@ export interface LoopContext {
   listDelegations(): Promise<ToolResult>;
   evaluatePermission(action: string, resource: string): PermissionEffect;
   resolvePermission?: PermissionResolver;
+  shell: ShellService;
+  onShellExit?: (note: string) => void;
   persistTurnUser(userMessage: ModelMessage): number | null;
   updateTurnDraft(text: string): void;
   deleteTurnDraft(): void;
@@ -223,6 +226,8 @@ async function* processMessageBatchTurn(
         readDelegation: (id) => ctx.readDelegation(id),
         listDelegations: () => ctx.listDelegations(),
         scheduleManager: ctx.schedules,
+        shell: ctx.shell,
+        onShellExit: ctx.onShellExit,
         subagents,
         agentDefinitions: loadAgentDefinitions(ctx.bash.getCwd()),
         sendTelegramFile: ctx.sendTelegramFile ?? undefined,
@@ -585,6 +590,8 @@ export async function* processMessage(
           readDelegation: (id) => ctx.readDelegation(id),
           listDelegations: () => ctx.listDelegations(),
           scheduleManager: ctx.schedules,
+          shell: ctx.shell,
+          onShellExit: ctx.onShellExit,
           subagents,
           agentDefinitions: loadAgentDefinitions(ctx.bash.getCwd()),
           sendTelegramFile: ctx.sendTelegramFile ?? undefined,

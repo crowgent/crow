@@ -1,4 +1,5 @@
 import type { ToolExecutionOptions, ToolSet } from "ai";
+import { classifyCommand } from "../tools/shell";
 import type { PermissionEffect, PermissionResolver } from "./permissions";
 
 export interface PermissionGateOptions {
@@ -21,7 +22,11 @@ function jsonInput(input: Record<string, unknown>): string {
 
 export const GATED_TOOLS: Record<string, ResourceExtractor> = {
   bash: stringField("command"),
-  shell: stringField("command"),
+  shell: (input) => {
+    const command = stringField("command")(input);
+    const classified = classifyCommand(command);
+    return classified.kind === "scanned" && classified.commands.length > 0 ? classified.commands.join(", ") : command;
+  },
   process_stop: (input) => String(input.id ?? ""),
   write_file: stringField("path"),
   edit_file: stringField("path"),

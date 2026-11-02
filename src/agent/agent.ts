@@ -41,6 +41,7 @@ import {
 } from "../storage/index";
 import { BashTool } from "../tools/bash";
 import { type ScheduleDaemonStatus, ScheduleManager, type StoredSchedule } from "../tools/schedule";
+import { ShellService } from "../tools/shell";
 import type {
   AgentMode,
   ChatEntry,
@@ -167,6 +168,8 @@ export class Agent {
   private recapsEnabled = true;
   private permissionStore = new PermissionStore();
   private permissionResolver: PermissionResolver | null = null;
+  private shell = new ShellService();
+  private pendingShellNotes: string[] = [];
   private questionResolver: QuestionResolver | null = null;
   private sessionTokenBudget = 0;
 
@@ -666,7 +669,24 @@ export class Agent {
         };
         this.fireHook(notifInput).catch(() => {});
       }
-      return notifications.map((notification) => notification.message);
+      const shellNotes = this.pendingShellNotes.splice(0);
+      for (const note of shellNotes) {
+        this.messages.push({ role: "system", content: note });
+        let seq: number | null = null;
+        if (this.session) {
+          seq = appendSystemMessage(this.session.id, note);
+        }
+        this.messageSeqs.push(seq);
+
+        const notifInput: NotificationHookInput = {
+          hook_event_name: "Notification",
+          message: note,
+          session_id: this.session?.id,
+          cwd: this.bash.getCwd(),
+        };
+        this.fireHook(notifInput).catch(() => {});
+      }
+      return [...notifications.map((notification) => notification.message), ...shellNotes];
     } catch {
       return [];
     }
@@ -878,6 +898,10 @@ export class Agent {
       evaluatePermission: (action, resource) => agent.permissionStore.evaluate(action, resource),
       get resolvePermission() {
         return agent.permissionResolver ?? undefined;
+      },
+      shell: agent.shell,
+      onShellExit: (note) => {
+        agent.pendingShellNotes.push(note);
       },
       persistTurnUser: (userMessage) => agent.persistTurnUser(userMessage),
       updateTurnDraft: (text) => agent.updateTurnDraft(text),

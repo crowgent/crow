@@ -31,14 +31,22 @@ export function matchGlob(pattern: string, value: string): boolean {
   return new RegExp(re).test(value);
 }
 
+export const DEFAULT_ALLOW_ACTIONS: ReadonlySet<string> = new Set(["shell", "bash"]);
+
+export const DEFAULT_ALLOW_RULES: PermissionRule[] = [
+  { action: "shell", resource: "*", effect: "allow" },
+  { action: "bash", resource: "*", effect: "allow" },
+];
+
 export function evaluatePermission(rules: PermissionRule[], action: string, resource: string): PermissionEffect {
-  let effect: PermissionEffect = "ask";
+  let effect: PermissionEffect | null = null;
   for (const rule of rules) {
     if (rule.action !== "*" && rule.action !== action) continue;
     if (!matchGlob(rule.resource, resource)) continue;
     effect = rule.effect;
   }
-  return effect;
+  if (effect !== null) return effect;
+  return DEFAULT_ALLOW_ACTIONS.has(action) ? "allow" : "ask";
 }
 
 export function defaultPermissionsPath(): string {
@@ -77,6 +85,14 @@ export class PermissionStore {
 
   constructor(private filePath: string = defaultPermissionsPath()) {
     this.rules = loadPermissionRules(filePath);
+    if (!fs.existsSync(filePath)) {
+      try {
+        this.rules = [...DEFAULT_ALLOW_RULES];
+        savePermissionRules(this.rules, filePath);
+      } catch {
+        this.rules = loadPermissionRules(filePath);
+      }
+    }
   }
 
   evaluate(action: string, resource: string): PermissionEffect {
