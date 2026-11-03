@@ -16,6 +16,7 @@ import {
 } from "../crow/models";
 import { parseEnvLines, parseHeaderLines } from "../mcp/parse-headers";
 import { toMcpServerId, validateMcpServerConfig } from "../mcp/validate";
+import type { SessionListEntry } from "../storage/index";
 import {
   isTelegramBridgeRunning,
   spawnDetachedTelegramBridge,
@@ -108,6 +109,7 @@ import {
   PlanView,
 } from "./plan";
 import { buildScheduleBrowseRows, ScheduleBrowserModal } from "./schedule-modal";
+import { filterSessionRows, SessionModal } from "./session-modal";
 import { filterSlashMenuItems, SLASH_MENU_ITEMS, type SlashMenuItem } from "./slash-menu";
 import {
   buildAssistantEntry,
@@ -257,6 +259,7 @@ const BUILTIN_TYPED_SLASH_COMMANDS = new Set([
   "/mcps",
   "/agents",
   "/agent",
+  "/session",
   "/schedule",
   "/schedules",
   "/quit",
@@ -729,6 +732,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const mcpEnvRef = useRef<TextareaRenderable>(null);
   const [showAgentsModal, setShowAgentsModal] = useState(false);
   const [showAgentsEditor, setShowAgentsEditor] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [sessionRows, setSessionRows] = useState<SessionListEntry[]>([]);
+  const [sessionSearchQuery, setSessionSearchQuery] = useState("");
+  const [sessionModalIndex, setSessionModalIndex] = useState(0);
   const [subAgents, setSubAgents] = useState<CustomSubagentConfig[]>(() => loadValidSubAgents());
   const [agentDefinitions, setAgentDefinitions] = useState<AgentDefinition[]>(() =>
     loadAgentDefinitions(process.cwd()),
@@ -754,6 +761,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [agentsEditorError, setAgentsEditorError] = useState<string | null>(null);
   const showAgentsModalRef = useRef(false);
   const showAgentsEditorRef = useRef(false);
+  const showSessionModalRef = useRef(false);
   const subagentNameRef = useRef<TextareaRenderable>(null);
   const subagentInstructionRef = useRef<TextareaRenderable>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
@@ -877,6 +885,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const scheduleRows = useMemo(
     () => buildScheduleBrowseRows(schedules, scheduleSearchQuery),
     [schedules, scheduleSearchQuery],
+  );
+  const filteredSessionRows = useMemo(
+    () => filterSessionRows(sessionRows, sessionSearchQuery),
+    [sessionRows, sessionSearchQuery],
   );
 
   const syncStoredMcpServers = useCallback((servers: McpServerConfig[]) => {
@@ -1508,6 +1520,47 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     questionQueueRef.current = [];
     setPendingQuestion(null);
   }, []);
+
+  const openSessionModal = useCallback(() => {
+    if (isProcessingRef.current) {
+      setMessages((prev) => [...prev, buildAssistantEntry("Cannot switch sessions while a turn is running.")]);
+      return;
+    }
+    setSessionRows(agent.listSessions());
+    setSessionSearchQuery("");
+    setSessionModalIndex(0);
+    setShowSessionModal(true);
+  }, [agent]);
+
+  const switchToSession = useCallback(
+    (id: string) => {
+      if (isProcessingRef.current) {
+        setMessages((prev) => [...prev, buildAssistantEntry("Cannot switch sessions while a turn is running.")]);
+        return;
+      }
+      let snapshot: ReturnType<typeof agent.switchSession>;
+      try {
+        snapshot = agent.switchSession(id);
+      } catch {
+        setMessages((prev) => [...prev, buildAssistantEntry(`Session "${id}" was not found.`)]);
+        return;
+      }
+      if (!snapshot) {
+        setMessages((prev) => [...prev, buildAssistantEntry("No session to switch to.")]);
+        return;
+      }
+      agent.clearPendingFollowUps();
+      activeTurnRef.current = null;
+      clearLiveTurnUi();
+      setMessages(snapshot.entries);
+      setSessionTitle(snapshot.session.title);
+      setSessionId(snapshot.session.id);
+      queuedMessagesRef.current = [];
+      setQueuedMessages([]);
+      setShowSessionModal(false);
+    },
+    [agent, clearLiveTurnUi],
+  );
 
   const finishTurnProcessing = useCallback(() => {
     const nextQueued = queuedMessagesRef.current.shift();
@@ -2206,6 +2259,9 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     showAgentsModalRef.current = showAgentsModal;
   }, [showAgentsModal]);
   useEffect(() => {
+    showSessionModalRef.current = showSessionModal;
+  }, [showSessionModal]);
+  useEffect(() => {
     showAgentsEditorRef.current = showAgentsEditor;
   }, [showAgentsEditor]);
   useEffect(() => {
@@ -2687,6 +2743,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         setQueuedMessages([]);
         return true;
       }
+      if (c.startsWith("/session ") || c === "/session") {
+        const target = cmd.trim().slice("/session".length).trim();
+        if (!target) {
+          openSessionModal();
+          return true;
+        }
+        switchToSession(target);
+        return true;
+      }
       if (c.startsWith("/transfer ") || c === "/transfer") {
         if (isProcessingRef.current) {
           setMessages((prev) => [...prev, buildAssistantEntry("Cannot transfer while a turn is running.")]);
@@ -2870,6 +2935,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       disconnectTelegramBridge,
       handleExit,
       openAgentsModal,
+      openSessionModal,
+      switchToSession,
       openMcpModal,
       openRecapPicker,
       openSandboxPicker,
@@ -2928,6 +2995,9 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         case "agents":
           openAgentsModal();
           break;
+        case "session":
+          openSessionModal();
+          break;
         case "schedule":
           openScheduleModal();
           break;
@@ -2962,6 +3032,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       disconnectTelegramBridge,
       handleExit,
       openAgentsModal,
+      openSessionModal,
       openMcpModal,
       openProviderConnect,
       openProviderModels,
@@ -3359,6 +3430,37 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         return;
       }
+      if (showSessionModalRef.current) {
+        const row = filteredSessionRows[sessionModalIndex];
+        if (isEscapeKey(key)) {
+          setShowSessionModal(false);
+          setSessionSearchQuery("");
+          return;
+        }
+        if (key.name === "up") {
+          setSessionModalIndex((index) => wrapListIndex(index, filteredSessionRows.length, -1));
+          return;
+        }
+        if (key.name === "down") {
+          setSessionModalIndex((index) => wrapListIndex(index, filteredSessionRows.length, 1));
+          return;
+        }
+        if (key.name === "return") {
+          if (row) switchToSession(row.id);
+          return;
+        }
+        if (key.name === "backspace") {
+          setSessionSearchQuery((query) => query.slice(0, -1));
+          setSessionModalIndex(0);
+          return;
+        }
+        if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
+          setSessionSearchQuery((query) => query + key.sequence);
+          setSessionModalIndex(0);
+          return;
+        }
+        return;
+      }
       if (showAgentsModalRef.current && !showAgentsEditorRef.current) {
         const row = agentRows[agentsModalIndex];
         if (isEscapeKey(key)) {
@@ -3513,7 +3615,17 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         }
         if (key.name === "return") {
           const item = filteredSlashItems[slashMenuIndex];
-          if (item) handleSlashMenuSelect(item);
+          if (item) {
+            handleSlashMenuSelect(item);
+          } else {
+            const typed = `/${slashSearchQuery}`.trim();
+            setShowSlashMenu(false);
+            setSlashSearchQuery("");
+            inputRef.current?.clear();
+            if (typed.length > 1 && !handleCommand(typed)) {
+              void processMessage(typed, typed);
+            }
+          }
           setSlashSearchQuery("");
           return;
         }
@@ -3891,6 +4003,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       removeSchedule,
       scheduleModalIndex,
       scheduleRows,
+      filteredSessionRows,
+      sessionModalIndex,
+      switchToSession,
+      handleCommand,
       showScheduleDetails,
       submitTelegramPair,
       submitTelegramToken,
@@ -3929,6 +4045,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       messages,
       startupConfig.version,
       selectedProviderId,
+      slashSearchQuery,
     ],
   );
   useKeyboard(handleKey);
@@ -4101,6 +4218,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showProviderModal={showProviderModal}
                 showAgentsModal={showAgentsModal}
                 showAgentsEditor={showAgentsEditor}
+                showSessionModal={showSessionModal}
                 blockPrompt={blockPrompt}
                 onSubmit={handleSubmit}
                 onPaste={handlePaste}
@@ -4119,6 +4237,12 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             <text fg={t.textDim}>{agent.getCwd().replace(os.homedir(), "~")}</text>
             {sandboxMode === "shuru" ? <text fg="#f97316">{" · sandbox"}</text> : null}
             <box flexGrow={1} />
+            <FooterHints
+              t={t}
+              isProcessing={isProcessing}
+              queuedCount={queuedMessages.length}
+              showSuggestions={typeahead?.visible ?? false}
+            />
           </box>
         </box>
       ) : (
@@ -4142,6 +4266,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showProviderModal={showProviderModal}
                 showAgentsModal={showAgentsModal}
                 showAgentsEditor={showAgentsEditor}
+                showSessionModal={showSessionModal}
                 blockPrompt={blockPrompt}
                 onSubmit={handleSubmit}
                 onPaste={handlePaste}
@@ -4185,6 +4310,14 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             <text fg={t.textDim}>{agent.getCwd().replace(os.homedir(), "~")}</text>
             {sandboxMode === "shuru" ? <text fg="#f97316">{" · sandbox"}</text> : null}
             <box flexGrow={1} />
+            <box paddingRight={2}>
+              <FooterHints
+                t={t}
+                isProcessing={isProcessing}
+                queuedCount={queuedMessages.length}
+                showSuggestions={typeahead?.visible ?? false}
+              />
+            </box>
             <text fg={t.textDim}>{`v${startupConfig.version}`}</text>
           </box>
         </>
@@ -4273,6 +4406,17 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           selectedIndex={agentsModalIndex}
           searchQuery={agentsSearchQuery}
           rows={agentRows}
+        />
+      )}
+      {showSessionModal && (
+        <SessionModal
+          t={t}
+          width={width}
+          height={height}
+          selectedIndex={sessionModalIndex}
+          searchQuery={sessionSearchQuery}
+          rows={filteredSessionRows}
+          currentId={sessionId}
         />
       )}
       {showAgentsEditor && (
@@ -4411,6 +4555,65 @@ function ContextMeter({ t, stats }: { t: Theme; stats: ContextStats }) {
   );
 }
 
+function FooterHints({
+  t,
+  isProcessing,
+  queuedCount,
+  showSuggestions,
+}: {
+  t: Theme;
+  isProcessing: boolean;
+  queuedCount: number;
+  showSuggestions: boolean;
+}) {
+  return (
+    <box flexDirection="row" gap={1} alignItems="center" height={1}>
+      {isProcessing ? (
+        <>
+          <text fg={t.text}>
+            {"enter "}
+            <span style={{ fg: t.textMuted }}>{"queue"}</span>
+          </text>
+          <text fg={t.text}>
+            {"esc "}
+            <span style={{ fg: t.textMuted }}>{queuedCount > 0 ? "clear queue" : "interrupt"}</span>
+          </text>
+        </>
+      ) : showSuggestions ? (
+        <>
+          <text fg={t.text}>
+            {"tab "}
+            <span style={{ fg: t.textMuted }}>{"accept"}</span>
+          </text>
+          <text fg={t.text}>
+            {"↑↓ "}
+            <span style={{ fg: t.textMuted }}>{"navigate"}</span>
+          </text>
+          <text fg={t.text}>
+            {"esc "}
+            <span style={{ fg: t.textMuted }}>{"dismiss"}</span>
+          </text>
+        </>
+      ) : (
+        <>
+          <text fg={t.text}>
+            {"@ "}
+            <span style={{ fg: t.textMuted }}>{"files"}</span>
+          </text>
+          <text fg={t.text}>
+            {"shift+enter "}
+            <span style={{ fg: t.textMuted }}>{"new line"}</span>
+          </text>
+          <text fg={t.text}>
+            {"tab "}
+            <span style={{ fg: t.textMuted }}>{"modes"}</span>
+          </text>
+        </>
+      )}
+    </box>
+  );
+}
+
 function PromptBox({
   t,
   inputRef,
@@ -4422,6 +4625,7 @@ function PromptBox({
   showProviderModal,
   showAgentsModal,
   showAgentsEditor,
+  showSessionModal,
   blockPrompt,
   onSubmit,
   onPaste,
@@ -4431,7 +4635,7 @@ function PromptBox({
   modelInfo,
   contextStats,
   placeholder,
-  queuedCount,
+  queuedCount: _queuedCount,
   queuedMessages,
   typeahead,
 }: {
@@ -4445,6 +4649,7 @@ function PromptBox({
   showProviderModal: boolean;
   showAgentsModal: boolean;
   showAgentsEditor: boolean;
+  showSessionModal: boolean;
   blockPrompt?: boolean;
   onSubmit: () => void;
   onPaste: (event: PasteEvent) => void;
@@ -4518,6 +4723,7 @@ function PromptBox({
                   !showProviderModal &&
                   !showAgentsModal &&
                   !showAgentsEditor &&
+                  !showSessionModal &&
                   !blockPrompt
                 }
                 placeholder={
@@ -4547,50 +4753,6 @@ function PromptBox({
               {isProcessing ? <DotSpinner t={t} /> : null}
               <text fg={t.text}>{modelInfo?.name || model || "No provider selected"}</text>
               {contextStats ? <ContextMeter t={t} stats={contextStats} /> : null}
-            </box>
-            <box flexDirection="row" gap={1} alignItems="center" height={1}>
-              {isProcessing ? (
-                <box flexDirection="row" gap={1}>
-                  <text fg={t.text}>
-                    {"enter "}
-                    <span style={{ fg: t.textMuted }}>{"queue"}</span>
-                  </text>
-                  <text fg={t.text}>
-                    {"esc "}
-                    <span style={{ fg: t.textMuted }}>{(queuedCount ?? 0) > 0 ? "clear queue" : "interrupt"}</span>
-                  </text>
-                </box>
-              ) : showSuggestions ? (
-                <box flexDirection="row" gap={1}>
-                  <text fg={t.text}>
-                    {"tab "}
-                    <span style={{ fg: t.textMuted }}>{"accept"}</span>
-                  </text>
-                  <text fg={t.text}>
-                    {"↑↓ "}
-                    <span style={{ fg: t.textMuted }}>{"navigate"}</span>
-                  </text>
-                  <text fg={t.text}>
-                    {"esc "}
-                    <span style={{ fg: t.textMuted }}>{"dismiss"}</span>
-                  </text>
-                </box>
-              ) : (
-                <>
-                  <text fg={t.text}>
-                    {"@ "}
-                    <span style={{ fg: t.textMuted }}>{"files"}</span>
-                  </text>
-                  <text fg={t.text}>
-                    {"shift+enter "}
-                    <span style={{ fg: t.textMuted }}>{"new line"}</span>
-                  </text>
-                  <text fg={t.text}>
-                    {"tab "}
-                    <span style={{ fg: t.textMuted }}>{"modes"}</span>
-                  </text>
-                </>
-              )}
             </box>
           </box>
         </box>

@@ -16,7 +16,7 @@ export {
   type TurnClaim,
   upsertTurnDraft,
 } from "./recovery";
-export { SessionStore } from "./sessions";
+export { type SessionListEntry, SessionStore } from "./sessions";
 export { addTodo, clearTodos, listTodos, removeTodo, setTodoStatus, type TodoItem, type TodoStatus } from "./todos";
 export {
   appendCompaction,

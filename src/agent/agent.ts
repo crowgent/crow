@@ -34,6 +34,7 @@ import {
   loadTranscript,
   loadTranscriptState,
   recordUsageEvent,
+  type SessionListEntry,
   SessionStore,
   setTurnClaim,
   upsertTurnDraft as storeTurnDraft,
@@ -440,6 +441,22 @@ export class Agent {
     if (!newId) return null;
     this.session = this.sessionStore.getRequiredSession(newId);
     const transcript = loadTranscriptState(newId);
+    this.messages = transcript.messages;
+    this.messageSeqs = transcript.seqs;
+    this.sessionStartHookFired = false;
+    return this.getSessionSnapshot();
+  }
+
+  listSessions(): SessionListEntry[] {
+    return this.sessionStore?.listSessions() ?? [];
+  }
+
+  switchSession(id: string): SessionSnapshot | null {
+    if (!this.sessionStore || !this.session) return null;
+    this.sessionStore.getRequiredSession(id);
+    this.sessionStore.touchSession(id, this.bash.getCwd());
+    this.session = this.sessionStore.getRequiredSession(id);
+    const transcript = loadTranscriptState(id);
     this.messages = transcript.messages;
     this.messageSeqs = transcript.seqs;
     this.sessionStartHookFired = false;

@@ -22,6 +22,7 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   },
   { id: "recaps", label: "recaps", description: "Turn session recaps on/off", aliases: ["recap", "summary"] },
   { id: "new", label: "new session", description: "Start a new session" },
+  { id: "session", label: "session", description: "Switch to an old session" },
   { id: "commit-push", label: "commit & push", description: "Commit and push" },
   { id: "commit-pr", label: "commit & pr", description: "Commit and open PR" },
   { id: "review", label: "review", description: "Review recent changes" },
@@ -38,8 +39,17 @@ export function filterSlashMenuItems(items: SlashMenuItem[], query: string): Sla
   return items
     .map((item, index) => ({ item, index, score: scoreSlashMenuItem(item, normalized) }))
     .filter((entry) => entry.score !== Number.POSITIVE_INFINITY)
-    .sort((a, b) => a.score - b.score || a.index - b.index)
+    .sort(
+      (a, b) =>
+        a.score - b.score ||
+        (isExactSlashCommand(a.item, normalized) ? 0 : 1) - (isExactSlashCommand(b.item, normalized) ? 0 : 1) ||
+        a.index - b.index,
+    )
     .map((entry) => entry.item);
+}
+
+function isExactSlashCommand(item: SlashMenuItem, query: string): boolean {
+  return item.id.toLowerCase() === query || item.label.toLowerCase() === query;
 }
 
 function normalizeSlashSearchQuery(query: string): string {

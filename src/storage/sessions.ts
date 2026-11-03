@@ -20,6 +20,10 @@ interface SessionRow {
   updated_at: string;
 }
 
+export interface SessionListEntry extends SessionInfo {
+  messageCount: number;
+}
+
 export class SessionStore {
   private readonly workspace: WorkspaceInfo;
 
@@ -100,6 +104,21 @@ export class SessionStore {
       .get(id) as SessionRow | undefined;
 
     return row ? toSessionInfo(row) : null;
+  }
+
+  listSessions(): SessionListEntry[] {
+    const rows = getDatabase()
+      .prepare(`
+      SELECT s.id, s.workspace_id, s.parent_id, s.title, s.recap_text, s.recap_model, s.recap_updated_at, s.model, s.mode, s.cwd_at_start, s.cwd_last, s.status, s.created_at, s.updated_at, COUNT(m.seq) AS message_count
+      FROM sessions s
+      LEFT JOIN messages m ON m.session_id = s.id
+      WHERE s.workspace_id = ?
+      GROUP BY s.id
+      ORDER BY s.updated_at DESC
+    `)
+      .all(this.workspace.id) as (SessionRow & { message_count: number })[];
+
+    return rows.map((row) => ({ ...toSessionInfo(row), messageCount: row.message_count }));
   }
 
   getRequiredSession(id: string): SessionInfo {
