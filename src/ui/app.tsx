@@ -4840,6 +4840,7 @@ function PromptBox({
           paddingLeft={2}
           paddingRight={2}
           paddingTop={1}
+          paddingBottom={1}
           backgroundColor={t.backgroundElement}
           flexDirection="column"
           flexShrink={0}
@@ -4870,16 +4871,7 @@ function PromptBox({
               onPaste={onPaste as unknown as (event: PasteEvent) => void}
             />
           </box>
-        </box>
-        <box
-          backgroundColor={t.backgroundElement}
-          paddingLeft={3}
-          paddingRight={2}
-          paddingTop={1}
-          flexDirection="column"
-          flexShrink={0}
-        >
-          <box flexDirection="row" justifyContent="space-between" alignItems="center">
+          <box flexDirection="row" justifyContent="space-between" alignItems="center" paddingTop={1}>
             <box flexDirection="row" gap={1} alignItems="center">
               {isProcessing ? <DotSpinner t={t} /> : null}
               <text fg={modeInfo.color}>{modeInfo.label}</text>
