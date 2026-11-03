@@ -1,6 +1,7 @@
 import { getTreeSitterClient, RGBA, SyntaxStyle, type TreeSitterClient } from "@opentui/core";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Theme } from "./theme";
+import { isExtraParsersPreloadSettled, preloadExtraParsers } from "./tree-sitter-parsers";
 
 const CODE_LANG_ALIASES: Record<string, string> = {
   js: "javascript",
@@ -11,6 +12,19 @@ const CODE_LANG_ALIASES: Record<string, string> = {
   tsx: "typescript",
   mts: "typescript",
   cts: "typescript",
+  py: "python",
+  py3: "python",
+  rs: "rust",
+  sh: "bash",
+  shell: "bash",
+  zsh: "bash",
+  "c++": "cpp",
+  h: "c",
+  cs: "csharp",
+  "c#": "csharp",
+  rb: "ruby",
+  yml: "yaml",
+  hs: "haskell",
 };
 
 function normalizeCodeFenceLanguages(content: string): string {
@@ -95,21 +109,28 @@ export function Markdown({ content, t, streaming }: { content: string; t: Theme;
   const syntaxStyle = useMemo(() => buildSyntaxStyle(t), [t]);
   const normalizedContent = useMemo(() => normalizeCodeFenceLanguages(content), [content]);
   const [tsClient, setTsClient] = useState<TreeSitterClient | null>(() => sharedClient);
+  const [parserGen, setParserGen] = useState(0);
+  const preloadDoneAtMount = useRef(isExtraParsersPreloadSettled()).current;
 
   useEffect(() => {
-    if (tsClient) return;
     let live = true;
-    loadTreeSitter().then((client) => {
-      if (live) setTsClient(client);
-    });
+    if (!tsClient) {
+      loadTreeSitter().then((client) => {
+        if (live) setTsClient(client);
+      });
+    } else if (!preloadDoneAtMount) {
+      preloadExtraParsers(tsClient).then((count) => {
+        if (live && count > 0) setParserGen((gen) => gen + 1);
+      });
+    }
     return () => {
       live = false;
     };
-  }, [tsClient]);
+  }, [tsClient, preloadDoneAtMount]);
 
   return (
     <markdown
-      key={tsClient ? "ts" : "plain"}
+      key={tsClient ? `ts-${parserGen}` : "plain"}
       content={normalizedContent}
       syntaxStyle={syntaxStyle}
       conceal={true}
