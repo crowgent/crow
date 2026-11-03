@@ -3705,8 +3705,15 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
           return;
         }
         if (key.name === "backspace") {
-          setSlashSearchQuery((q) => q.slice(0, -1));
-          setSlashMenuIndex(0);
+          if (slashSearchQuery.length === 0) {
+            setShowSlashMenu(false);
+            setSlashSearchQuery("");
+            setSlashMenuIndex(0);
+            inputRef.current?.clear();
+          } else {
+            setSlashSearchQuery((q) => q.slice(0, -1));
+            setSlashMenuIndex(0);
+          }
           return;
         }
         if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
@@ -6085,7 +6092,7 @@ function SlashMenuPanel({
     const item = filteredItems[selectedIndex];
     if (item) listRef.current?.scrollChildIntoView(`slash-${item.id}`);
   }, [selectedIndex, filteredItems]);
-  const visible = filteredItems.length === 0 ? 1 : Math.min(filteredItems.length, 10);
+  const visible = Math.min(SLASH_MENU_ITEMS.length, 10);
   return (
     <box backgroundColor={t.backgroundPanel} flexDirection="column" flexShrink={0} height={visible}>
       <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
