@@ -51,6 +51,7 @@ import {
 import { processAtMentions } from "../utils/at-mentions.js";
 import { FileIndex } from "../utils/file-index.js";
 import { copyTextToHostClipboard } from "../utils/host-clipboard";
+import { getScriptInstallContext } from "../utils/install-manager";
 import {
   type CustomProvider,
   fetchProviderModels,
@@ -448,6 +449,7 @@ interface AppProps {
   startupConfig: AppStartupConfig;
   initialMessage?: string;
   onExit?: () => void;
+  onRestart?: (binaryPath: string, args: string[]) => void;
 }
 
 interface ActiveTurnState {
@@ -461,7 +463,23 @@ interface ActiveTurnState {
   flushedAssistantChars: number;
 }
 
-export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) {
+function buildRestartArgs(argv: string[], sessionId: string | null): string[] {
+  const userArgs = argv[1] && (argv[1].endsWith(".js") || argv[1].endsWith(".ts")) ? argv.slice(2) : argv.slice(1);
+  const args: string[] = [];
+  for (let i = 0; i < userArgs.length; i++) {
+    const arg = userArgs[i];
+    if (arg === "--session") {
+      i++;
+      continue;
+    }
+    if (arg.startsWith("--session=")) continue;
+    args.push(arg);
+  }
+  if (sessionId) args.push("--session", sessionId);
+  return args;
+}
+
+export function App({ agent, startupConfig, initialMessage, onExit, onRestart }: AppProps) {
   const t = dark;
   const renderer = useRenderer();
   const initialHasApiKey = agent.hasApiKey();
@@ -777,7 +795,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateOutput, setUpdateOutput] = useState<string | null>(null);
+  const [updatePhase, setUpdatePhase] = useState<"available" | "updating" | "done" | "failed">("available");
+  const [updateProgress, setUpdateProgress] = useState("");
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateChoiceIndex, setUpdateChoiceIndex] = useState(0);
+  const [updateInstalled, setUpdateInstalled] = useState(false);
   const showUpdateModalRef = useRef(false);
+  const updatePhaseRef = useRef<"available" | "updating" | "done" | "failed">("available");
+  const updateChoiceIndexRef = useRef(0);
+  const sessionIdRef = useRef<string | null>(null);
 
   const fileIndexRef = useRef<FileIndex | null>(null);
   if (!fileIndexRef.current) {
@@ -2276,6 +2302,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   useEffect(() => {
     showUpdateModalRef.current = showUpdateModal;
   }, [showUpdateModal]);
+  useEffect(() => {
+    updatePhaseRef.current = updatePhase;
+  }, [updatePhase]);
+  useEffect(() => {
+    updateChoiceIndexRef.current = updateChoiceIndex;
+  }, [updateChoiceIndex]);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3135,6 +3170,22 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
     setBtwState(null);
   }, []);
 
+  const startModalUpdate = useCallback(() => {
+    setUpdatePhase("updating");
+    setUpdateProgress("Starting update...");
+    setUpdateError(null);
+    runUpdate(startupConfig.version, (step) => setUpdateProgress(step)).then((result) => {
+      if (result.success) {
+        setUpdateInstalled(true);
+        setUpdateChoiceIndex(0);
+        setUpdatePhase("done");
+      } else {
+        setUpdateError(result.output);
+        setUpdatePhase("failed");
+      }
+    });
+  }, [startupConfig.version]);
+
   const handleKey = useCallback(
     (key: KeyEvent) => {
       if (btwState) {
@@ -3269,17 +3320,35 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
         return;
       }
       if (showUpdateModalRef.current) {
+        if (updatePhaseRef.current === "updating") return;
         if (isEscapeKey(key)) {
           setShowUpdateModal(false);
+          setUpdatePhase("available");
           return;
         }
-        if (key.name === "return") {
-          setIsUpdating(true);
-          setShowUpdateModal(false);
-          runUpdate(startupConfig.version).then((result) => {
-            setIsUpdating(false);
-            setUpdateOutput(result.output);
-          });
+        if (updatePhaseRef.current === "available" && key.name === "return") {
+          startModalUpdate();
+          return;
+        }
+        if (updatePhaseRef.current === "done") {
+          if (key.name === "up" || key.name === "down") {
+            setUpdateChoiceIndex((i) => (key.name === "up" ? (i + 1) % 2 : (i + 1) % 2));
+            return;
+          }
+          if (key.name === "return") {
+            if (updateChoiceIndexRef.current === 0) {
+              const binaryPath = getScriptInstallContext()?.binaryPath ?? process.execPath;
+              onRestart?.(binaryPath, buildRestartArgs(process.argv, sessionIdRef.current));
+            } else {
+              setShowUpdateModal(false);
+              setUpdatePhase("available");
+            }
+            return;
+          }
+          return;
+        }
+        if (updatePhaseRef.current === "failed" && key.name === "return") {
+          startModalUpdate();
           return;
         }
         return;
@@ -4049,7 +4118,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
       copyTuiSelectionToHost,
       toggleSavedMcp,
       messages,
-      startupConfig.version,
+      onRestart,
+      startModalUpdate,
       selectedProviderId,
       slashSearchQuery,
     ],
@@ -4318,7 +4388,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             <box height={2} minHeight={0} flexShrink={1} />
             <box flexGrow={1} minHeight={0} />
           </box>
-          {updateInfo?.hasUpdate && (
+          {updateInfo?.hasUpdate && !updateInstalled && (
             <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
               <text fg="#f59e0b">
                 {"┃ Update available: v"}
@@ -4406,6 +4476,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           height={height}
           currentVersion={startupConfig.version}
           latestVersion={updateInfo.latestVersion}
+          phase={updatePhase}
+          progress={updateProgress}
+          error={updateError}
+          choiceIndex={updateChoiceIndex}
         />
       )}
       {showMcpModal && !showMcpEditor && (
@@ -5880,17 +5954,35 @@ function UpdateModal({
   height,
   currentVersion,
   latestVersion,
+  phase,
+  progress,
+  error,
+  choiceIndex,
 }: {
   t: Theme;
   width: number;
   height: number;
   currentVersion: string;
   latestVersion: string;
+  phase: "available" | "updating" | "done" | "failed";
+  progress: string;
+  error: string | null;
+  choiceIndex: number;
 }) {
   const overlayBg = "#000000cc" as string;
   const panelWidth = Math.min(60, width - 6);
-  const panelHeight = 9;
+  const panelHeight = phase === "done" || phase === "failed" ? 11 : 9;
   const top = bottomAlignedModalTop(height, panelHeight);
+  const title =
+    phase === "done"
+      ? "Update Complete"
+      : phase === "failed"
+        ? "Update Failed"
+        : phase === "updating"
+          ? "Updating..."
+          : "Update Available";
+  const titleColor = phase === "done" ? "#22c55e" : phase === "failed" ? "#ef4444" : "#f59e0b";
+  const dismissHint = phase === "done" ? "esc for later" : phase === "updating" ? "please wait" : "esc to dismiss";
 
   return (
     <box
@@ -5912,28 +6004,76 @@ function UpdateModal({
         flexDirection="column"
       >
         <box flexShrink={0} flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2}>
-          <text fg="#f59e0b">
-            <b>{"Update Available"}</b>
+          <text fg={titleColor}>
+            <b>{title}</b>
           </text>
-          <text fg={t.textMuted}>{"esc to dismiss"}</text>
+          <text fg={t.textMuted}>{dismissHint}</text>
         </box>
-        <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
-          <text fg={t.text}>
-            {"A new version of crow is available: "}
-            <span style={{ fg: t.textMuted }}>
-              {"v"}
-              {currentVersion}
-            </span>
-            {" → "}
-            <span style={{ fg: "#22c55e" }}>
-              {"v"}
-              {latestVersion}
-            </span>
-          </text>
-        </box>
-        <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
-          <text fg={t.textMuted}>{"Press enter to update now, or esc to dismiss"}</text>
-        </box>
+        {phase === "available" && (
+          <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <text fg={t.text}>
+              {"A new version of crow is available: "}
+              <span style={{ fg: t.textMuted }}>
+                {"v"}
+                {currentVersion}
+              </span>
+              {" → "}
+              <span style={{ fg: "#22c55e" }}>
+                {"v"}
+                {latestVersion}
+              </span>
+            </text>
+          </box>
+        )}
+        {phase === "available" && (
+          <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <text fg={t.textMuted}>{"Press enter to update now, or esc to dismiss"}</text>
+          </box>
+        )}
+        {phase === "updating" && (
+          <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <text fg="#f59e0b">{progress}</text>
+          </box>
+        )}
+        {phase === "done" && (
+          <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <text fg={t.text}>
+              {"Crow has been updated to "}
+              <span style={{ fg: "#22c55e" }}>
+                {"v"}
+                {latestVersion}
+              </span>
+              {"."}
+            </text>
+          </box>
+        )}
+        {phase === "done" && (
+          <box flexShrink={0} flexDirection="column" paddingTop={1}>
+            <box backgroundColor={choiceIndex === 0 ? t.selectedBg : undefined} paddingLeft={2} paddingRight={2}>
+              <text fg={choiceIndex === 0 ? t.selected : t.text}>
+                {choiceIndex === 0 ? "> Restart now" : "  Restart now"}
+              </text>
+            </box>
+            <box backgroundColor={choiceIndex === 1 ? t.selectedBg : undefined} paddingLeft={2} paddingRight={2}>
+              <text fg={choiceIndex === 1 ? t.selected : t.text}>{choiceIndex === 1 ? "> Later" : "  Later"}</text>
+            </box>
+          </box>
+        )}
+        {phase === "done" && (
+          <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <text fg={t.textMuted}>{"↑↓ to choose · enter to confirm · esc for later"}</text>
+          </box>
+        )}
+        {phase === "failed" && (
+          <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <text fg="#ef4444">{error}</text>
+          </box>
+        )}
+        {phase === "failed" && (
+          <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1}>
+            <text fg={t.textMuted}>{"Press enter to retry, or esc to dismiss"}</text>
+          </box>
+        )}
       </box>
     </box>
   );

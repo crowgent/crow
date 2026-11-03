@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import type { ModelMessage } from "ai";
+import { spawn } from "child_process";
 import { InvalidArgumentError, program } from "commander";
 import readline from "readline";
 import packageJson from "../package.json";
@@ -98,6 +99,24 @@ async function startInteractive(
     });
   };
 
+  const onRestart = (binaryPath: string, args: string[]) => {
+    void agent.cleanup().finally(() => {
+      renderer.destroy();
+      const launch = () => {
+        const child = spawn(binaryPath, args, { stdio: "inherit" });
+        child.on("error", (err) => {
+          console.error(`Failed to restart: ${err.message}`);
+          process.exit(1);
+        });
+        child.on("exit", (code, signal) => {
+          process.exit(signal ? 1 : (code ?? 0));
+        });
+      };
+      if (process.platform === "win32") setTimeout(launch, 3000);
+      else launch();
+    });
+  };
+
   createRoot(renderer).render(
     createElement(App, {
       agent,
@@ -112,6 +131,7 @@ async function startInteractive(
       },
       initialMessage,
       onExit,
+      onRestart,
     }),
   );
 }

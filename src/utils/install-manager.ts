@@ -169,7 +169,10 @@ export function parseChecksumsFile(contents: string): Map<string, string> {
   return result;
 }
 
-export async function runScriptManagedUpdate(currentVersion: string): Promise<ScriptUpdateRunResult> {
+export async function runScriptManagedUpdate(
+  currentVersion: string,
+  onProgress?: (step: string) => void,
+): Promise<ScriptUpdateRunResult> {
   const context = getScriptInstallContext();
   if (!context) return notScriptManaged("update");
 
@@ -178,6 +181,7 @@ export async function runScriptManagedUpdate(currentVersion: string): Promise<Sc
     return { success: false, output: `Cannot update: current version "${currentVersion}" is invalid.` };
   }
 
+  onProgress?.("Finding latest release...");
   const release = await resolveReleaseDownload(context.target);
   if (!release) {
     return { success: false, output: "No matching release found for this platform." };
@@ -189,9 +193,11 @@ export async function runScriptManagedUpdate(currentVersion: string): Promise<Sc
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "crow-update-"));
   try {
+    onProgress?.("Downloading update...");
     const downloadedPath = path.join(tempDir, release.asset.name);
     await downloadBinary(release.asset.browser_download_url, downloadedPath);
 
+    onProgress?.("Verifying checksum...");
     const checksumsText = await downloadText(release.checksums.browser_download_url);
     const expectedHash = parseChecksumsFile(checksumsText).get(release.asset.name);
     if (!expectedHash) return { success: false, output: `Missing checksum for ${release.asset.name}.` };
@@ -200,6 +206,7 @@ export async function runScriptManagedUpdate(currentVersion: string): Promise<Sc
       return { success: false, output: `Checksum mismatch for ${release.asset.name}; aborting.` };
     }
 
+    onProgress?.("Installing update...");
     fs.mkdirSync(path.dirname(context.binaryPath), { recursive: true, mode: 0o700 });
 
     if (process.platform === "win32") {

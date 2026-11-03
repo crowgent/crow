@@ -28,6 +28,6 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateChec
   }
 }
 
-export function runUpdate(currentVersion: string): Promise<UpdateRunResult> {
-  return runScriptManagedUpdate(currentVersion);
+export function runUpdate(currentVersion: string, onProgress?: (step: string) => void): Promise<UpdateRunResult> {
+  return runScriptManagedUpdate(currentVersion, onProgress);
 }
