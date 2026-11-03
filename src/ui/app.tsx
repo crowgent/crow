@@ -4240,7 +4240,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               />
             </box>
           </box>
-          <box paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="space-between" flexShrink={0}>
+          <box
+            paddingLeft={2}
+            paddingRight={2}
+            paddingTop={1}
+            paddingBottom={1}
+            flexDirection="row"
+            justifyContent="space-between"
+            flexShrink={0}
+          >
             <box flexDirection="row">
               <text fg={t.textDim}>
                 <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
@@ -4331,7 +4339,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               </text>
             </box>
           )}
-          <box paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="space-between" flexShrink={0}>
+          <box
+            paddingLeft={2}
+            paddingRight={2}
+            paddingTop={1}
+            paddingBottom={1}
+            flexDirection="row"
+            justifyContent="space-between"
+            flexShrink={0}
+          >
             <box flexDirection="row">
               <text fg={t.textDim}>
                 <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
@@ -4799,13 +4815,7 @@ function PromptBox({
             </box>
           </box>
         </box>
-        <box
-          border={["left", "bottom"]}
-          customBorderChars={EDGE}
-          borderColor={t.backgroundElement}
-          height={1}
-          flexShrink={0}
-        />
+        <box border={["bottom"]} customBorderChars={EDGE} borderColor={t.backgroundElement} height={1} flexShrink={0} />
       </box>
     </box>
   );
