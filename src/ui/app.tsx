@@ -6092,7 +6092,7 @@ function SlashMenuPanel({
     const item = filteredItems[selectedIndex];
     if (item) listRef.current?.scrollChildIntoView(`slash-${item.id}`);
   }, [selectedIndex, filteredItems]);
-  const visible = Math.min(SLASH_MENU_ITEMS.length, 10);
+  const visible = filteredItems.length === 0 ? 1 : Math.min(filteredItems.length, 10);
   return (
     <box backgroundColor={t.backgroundPanel} flexDirection="column" flexShrink={0} height={visible}>
       <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
