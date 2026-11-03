@@ -3648,11 +3648,11 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           return;
         }
         if (key.name === "up") {
-          setModelPickerIndex((i) => Math.max(0, i - 1));
+          setModelPickerIndex((i) => wrapListIndex(i, filteredModelIds.length, -1));
           return;
         }
         if (key.name === "down") {
-          setModelPickerIndex((i) => Math.min(filteredModelIds.length - 1, i + 1));
+          setModelPickerIndex((i) => wrapListIndex(i, filteredModelIds.length, 1));
           return;
         }
         if (key.name === "left" || key.name === "right") {
