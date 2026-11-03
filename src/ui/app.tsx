@@ -97,6 +97,7 @@ import {
 } from "./agents-modal";
 import { BtwOverlay, type BtwState } from "./components/btw-overlay.js";
 import { SuggestionOverlay } from "./components/SuggestionOverlay.js";
+import { formatCompactTokens, formatCostUsd } from "./footer-format";
 import { type TypeaheadState, useTypeahead } from "./hooks/useTypeahead.js";
 import { Markdown } from "./markdown";
 import { buildMcpBrowseRows, McpBrowserModal, McpEditorModal } from "./mcp-modal";
@@ -182,6 +183,7 @@ const SPLIT = {
   rightT: "",
 };
 const _SPLIT_END = { ...SPLIT, bottomLeft: "╹" };
+const EDGE = { ...SPLIT, bottomLeft: "╹", horizontal: "▀" };
 const _EMPTY = {
   topLeft: "",
   bottomLeft: "",
@@ -833,7 +835,10 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
   const modeInfo = MODES.find((m) => m.id === mode)!;
   modeInfoRef.current = modeInfo;
   const modelInfo = getModelInfo(model);
-  const contextStats = modelInfo ? agent.getContextStats(modelInfo.contextWindow, streamContent) : null;
+  const contextStats: ContextStats | null = modelInfo
+    ? agent.getContextStats(modelInfo.contextWindow, streamContent)
+    : null;
+  const sessionCostMicros = agent.getSessionCostMicros();
   const providerModelInfos: ModelInfo[] = (() => {
     if (!selectedProviderId) return [];
     const custom = customProviders.find((provider) => provider.id === selectedProviderId);
@@ -4227,29 +4232,52 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 modeInfo={modeInfo}
                 model={model}
                 modelInfo={modelInfo}
-                contextStats={contextStats}
+                providerName={selectedProviderId ? findProvider(selectedProviderId, customProviders)?.name : undefined}
+                reasoningEffort={model ? getModelReasoningEffort(model) : undefined}
                 queuedCount={queuedMessages.length}
                 queuedMessages={queuedMessages}
                 typeahead={typeahead}
               />
             </box>
           </box>
-          <box paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} flexDirection="row" flexShrink={0}>
-            <text fg={t.textDim}>
-              <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
-            </text>
-            {sandboxMode === "shuru" ? (
-              <text fg="#f97316">
-                <b>{" · sandbox"}</b>
+          <box
+            backgroundColor={t.backgroundElement}
+            paddingLeft={2}
+            paddingRight={2}
+            paddingTop={1}
+            paddingBottom={1}
+            flexDirection="row"
+            justifyContent="space-between"
+            flexShrink={0}
+          >
+            <box flexDirection="row">
+              <text fg={t.textDim}>
+                <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
               </text>
+              {sandboxMode === "shuru" ? (
+                <text fg="#f97316">
+                  <b>{" · sandbox"}</b>
+                </text>
+              ) : null}
+            </box>
+            {contextStats ? (
+              <box flexDirection="row">
+                <text fg={t.textMuted}>
+                  <b>
+                    {`${formatCompactTokens(contextStats.usedTokens)} (${Math.round(contextStats.ratioUsed * 100)}%)`}
+                    {sessionCostMicros > 0 ? ` · ${formatCostUsd(sessionCostMicros)}` : ""}
+                  </b>
+                </text>
+              </box>
             ) : null}
-            <box flexGrow={1} />
-            <FooterHints
-              t={t}
-              isProcessing={isProcessing}
-              queuedCount={queuedMessages.length}
-              showSuggestions={typeahead?.visible ?? false}
-            />
+            <box flexDirection="row">
+              <FooterHints
+                t={t}
+                isProcessing={isProcessing}
+                queuedCount={queuedMessages.length}
+                showSuggestions={typeahead?.visible ?? false}
+              />
+            </box>
           </box>
         </box>
       ) : (
@@ -4281,7 +4309,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 modeInfo={modeInfo}
                 model={model}
                 modelInfo={modelInfo}
-                contextStats={contextStats}
+                providerName={selectedProviderId ? findProvider(selectedProviderId, customProviders)?.name : undefined}
+                reasoningEffort={model ? getModelReasoningEffort(model) : undefined}
                 placeholder={"What are we building?"}
                 typeahead={typeahead}
               />
@@ -4313,27 +4342,49 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               </text>
             </box>
           )}
-          <box paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} flexDirection="row" flexShrink={0}>
-            <text fg={t.textDim}>
-              <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
-            </text>
-            {sandboxMode === "shuru" ? (
-              <text fg="#f97316">
-                <b>{" · sandbox"}</b>
+          <box
+            backgroundColor={t.backgroundElement}
+            paddingLeft={2}
+            paddingRight={2}
+            paddingTop={1}
+            paddingBottom={1}
+            flexDirection="row"
+            justifyContent="space-between"
+            flexShrink={0}
+          >
+            <box flexDirection="row">
+              <text fg={t.textDim}>
+                <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
               </text>
-            ) : null}
-            <box flexGrow={1} />
-            <box paddingRight={2}>
-              <FooterHints
-                t={t}
-                isProcessing={isProcessing}
-                queuedCount={queuedMessages.length}
-                showSuggestions={typeahead?.visible ?? false}
-              />
+              {sandboxMode === "shuru" ? (
+                <text fg="#f97316">
+                  <b>{" · sandbox"}</b>
+                </text>
+              ) : null}
             </box>
-            <text fg={t.textDim}>
-              <b>{`v${startupConfig.version}`}</b>
-            </text>
+            {contextStats ? (
+              <box flexDirection="row">
+                <text fg={t.textMuted}>
+                  <b>
+                    {`${formatCompactTokens(contextStats.usedTokens)} (${Math.round(contextStats.ratioUsed * 100)}%)`}
+                    {sessionCostMicros > 0 ? ` · ${formatCostUsd(sessionCostMicros)}` : ""}
+                  </b>
+                </text>
+              </box>
+            ) : null}
+            <box flexDirection="row">
+              <box paddingRight={2}>
+                <FooterHints
+                  t={t}
+                  isProcessing={isProcessing}
+                  queuedCount={queuedMessages.length}
+                  showSuggestions={typeahead?.visible ?? false}
+                />
+              </box>
+              <text fg={t.textDim}>
+                <b>{`v${startupConfig.version}`}</b>
+              </text>
+            </box>
           </box>
         </>
       )}
@@ -4555,21 +4606,6 @@ const TEXTAREA_KEYBINDINGS: KeyBinding[] = [
   { name: "return", shift: true, action: "newline" },
 ];
 
-function formatTokenCount(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-  if (tokens >= 1_000) return `${Math.round(tokens / 1_000)}K`;
-  return String(tokens);
-}
-
-function ContextMeter({ t, stats }: { t: Theme; stats: ContextStats }) {
-  return (
-    <text>
-      <span style={{ fg: t.textMuted }}>{`${Math.round(stats.ratioRemaining * 100)}%`}</span>
-      <span style={{ fg: t.textDim }}>{` ${formatTokenCount(stats.remainingTokens)}`}</span>
-    </text>
-  );
-}
-
 function FooterHints({
   t,
   isProcessing,
@@ -4664,7 +4700,8 @@ function PromptBox({
   modeInfo,
   model,
   modelInfo,
-  contextStats,
+  providerName,
+  reasoningEffort,
   placeholder,
   queuedCount: _queuedCount,
   queuedMessages,
@@ -4688,7 +4725,8 @@ function PromptBox({
   modeInfo: (typeof MODES)[number];
   model: string;
   modelInfo: ReturnType<typeof getModelInfo>;
-  contextStats?: ContextStats | null;
+  providerName?: string;
+  reasoningEffort?: ReasoningEffort;
   placeholder?: string;
   queuedCount?: number;
   queuedMessages?: string[];
@@ -4698,7 +4736,7 @@ function PromptBox({
   const showSuggestions = typeahead?.visible ?? false;
 
   return (
-    <box backgroundColor={t.backgroundPanel}>
+    <box>
       <box>
         {hasQueue && (
           <box
@@ -4733,70 +4771,67 @@ function PromptBox({
           <SuggestionOverlay t={t} suggestions={typeahead.suggestions} selectedIndex={typeahead.selectedIndex} />
         )}
         <box
+          border={["left"]}
+          customBorderChars={SPLIT}
+          borderColor={modeInfo.color}
           paddingLeft={2}
           paddingRight={2}
           paddingTop={1}
-          paddingBottom={1}
           backgroundColor={t.backgroundElement}
           flexDirection="column"
           flexShrink={0}
         >
-          <box flexDirection="row" gap={2} alignItems="flex-start">
-            <PromptModeLabel t={t} modeInfo={modeInfo} isProcessing={isProcessing} />
-            <box flexGrow={1}>
-              <textarea
-                ref={inputRef}
-                focused={
-                  !showModelPicker &&
-                  !showSandboxPicker &&
-                  !showSlashMenu &&
-                  !showPlanQuestions &&
-                  !showProviderModal &&
-                  !showAgentsModal &&
-                  !showAgentsEditor &&
-                  !showSessionModal &&
-                  !blockPrompt
-                }
-                placeholder={
-                  isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Crow..."
-                }
-                textColor={t.text}
-                backgroundColor={t.backgroundElement}
-                placeholderColor={t.textMuted}
-                minHeight={1}
-                maxHeight={10}
-                wrapMode="word"
-                keyBindings={TEXTAREA_KEYBINDINGS}
-                onSubmit={onSubmit as unknown as () => void}
-                onPaste={onPaste as unknown as (event: PasteEvent) => void}
-              />
-            </box>
+          <box flexGrow={1}>
+            <textarea
+              ref={inputRef}
+              focused={
+                !showModelPicker &&
+                !showSandboxPicker &&
+                !showSlashMenu &&
+                !showPlanQuestions &&
+                !showProviderModal &&
+                !showAgentsModal &&
+                !showAgentsEditor &&
+                !showSessionModal &&
+                !blockPrompt
+              }
+              placeholder={isProcessing ? "Queue a follow-up... (esc to interrupt)" : placeholder || "Message Crow..."}
+              textColor={t.text}
+              backgroundColor={t.backgroundElement}
+              placeholderColor={t.textMuted}
+              minHeight={1}
+              maxHeight={10}
+              wrapMode="word"
+              keyBindings={TEXTAREA_KEYBINDINGS}
+              onSubmit={onSubmit as unknown as () => void}
+              onPaste={onPaste as unknown as (event: PasteEvent) => void}
+            />
           </box>
-          <box
-            flexDirection="row"
-            justifyContent="space-between"
-            alignItems="center"
-            paddingTop={1}
-            height={1}
-            flexShrink={0}
-          >
-            <box flexDirection="row" gap={1} alignItems="center" height={1}>
+          <box flexDirection="row" justifyContent="space-between" alignItems="center" paddingTop={1} flexShrink={0}>
+            <box flexDirection="row" gap={1} alignItems="center">
               {isProcessing ? <DotSpinner t={t} /> : null}
+              <text fg={modeInfo.color}>{modeInfo.label}</text>
+              <text fg={t.textMuted}>{"·"}</text>
               <text fg={t.text}>{modelInfo?.name || model || "No provider selected"}</text>
-              {contextStats ? <ContextMeter t={t} stats={contextStats} /> : null}
+              {providerName ? <text fg={t.textMuted}>{providerName}</text> : null}
+              {reasoningEffort ? <text fg={t.textMuted}>{"·"}</text> : null}
+              {reasoningEffort ? (
+                <text fg={t.effort}>
+                  <b>{reasoningEffort}</b>
+                </text>
+              ) : null}
             </box>
           </box>
         </box>
+        <box
+          border={["left", "bottom"]}
+          customBorderChars={EDGE}
+          borderColor={t.backgroundElement}
+          height={1}
+          flexShrink={0}
+        />
       </box>
     </box>
-  );
-}
-
-function PromptModeLabel({ modeInfo }: { t: Theme; modeInfo: (typeof MODES)[number]; isProcessing: boolean }) {
-  return (
-    <text fg={modeInfo.color}>
-      <b>{modeInfo.label}</b>
-    </text>
   );
 }
 

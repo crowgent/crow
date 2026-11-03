@@ -67,6 +67,18 @@ export function getSessionTotalTokens(sessionId: string): number {
   return row?.total_tokens ?? 0;
 }
 
+export function getSessionTotalCostMicros(sessionId: string): number {
+  const row = getDatabase()
+    .prepare(`
+    SELECT COALESCE(SUM(cost_micros), 0) AS cost_micros
+    FROM usage_events
+    WHERE session_id = ?
+  `)
+    .get(sessionId) as { cost_micros: number } | undefined;
+
+  return row?.cost_micros ?? 0;
+}
+
 export function listSessionUsage(sessionId: string): UsageEvent[] {
   const rows = getDatabase()
     .prepare(`

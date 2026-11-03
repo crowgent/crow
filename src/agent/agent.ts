@@ -29,6 +29,7 @@ import {
   deleteTurnDraft as deleteStoredTurnDraft,
   enqueueInbox,
   forkSession as forkStoredSession,
+  getSessionTotalCostMicros,
   getSessionTotalTokens,
   listInbox,
   loadTranscript,
@@ -669,6 +670,11 @@ export class Agent {
     if (this.session) {
       recordUsageEvent(this.session.id, source, model, usage);
     }
+  }
+
+  getSessionCostMicros(): number {
+    if (!this.session) return 0;
+    return getSessionTotalCostMicros(this.session.id);
   }
 
   async consumeBackgroundNotifications(): Promise<string[]> {
