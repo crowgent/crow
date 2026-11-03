@@ -287,9 +287,9 @@ const SANDBOX_ROWS: SandboxRow[] = [
     key: "mode",
     label: "Mode",
     type: "toggle",
-    getDisplay: (mode) => (mode === "shuru" ? "Shuru" : "Off"),
-    getOptions: () => ["Off", "Shuru"],
-    apply: (_mode, _s, value) => ({ mode: value === "Shuru" ? "shuru" : "off" }),
+    getDisplay: (mode) => (mode === "shuru" ? "On" : "Off"),
+    getOptions: () => ["Off", "On"],
+    apply: (_mode, _s, value) => ({ mode: value === "On" ? "shuru" : "off" }),
   },
   {
     key: "allowNet",
@@ -4234,8 +4234,14 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             </box>
           </box>
           <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
-            <text fg={t.textDim}>{agent.getCwd().replace(os.homedir(), "~")}</text>
-            {sandboxMode === "shuru" ? <text fg="#f97316">{" · sandbox"}</text> : null}
+            <text fg={t.textDim}>
+              <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
+            </text>
+            {sandboxMode === "shuru" ? (
+              <text fg="#f97316">
+                <b>{" · sandbox"}</b>
+              </text>
+            ) : null}
             <box flexGrow={1} />
             <FooterHints
               t={t}
@@ -4307,8 +4313,14 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
             </box>
           )}
           <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
-            <text fg={t.textDim}>{agent.getCwd().replace(os.homedir(), "~")}</text>
-            {sandboxMode === "shuru" ? <text fg="#f97316">{" · sandbox"}</text> : null}
+            <text fg={t.textDim}>
+              <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
+            </text>
+            {sandboxMode === "shuru" ? (
+              <text fg="#f97316">
+                <b>{" · sandbox"}</b>
+              </text>
+            ) : null}
             <box flexGrow={1} />
             <box paddingRight={2}>
               <FooterHints
@@ -4318,7 +4330,9 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showSuggestions={typeahead?.visible ?? false}
               />
             </box>
-            <text fg={t.textDim}>{`v${startupConfig.version}`}</text>
+            <text fg={t.textDim}>
+              <b>{`v${startupConfig.version}`}</b>
+            </text>
           </box>
         </>
       )}
@@ -4571,42 +4585,58 @@ function FooterHints({
       {isProcessing ? (
         <>
           <text fg={t.text}>
-            {"enter "}
-            <span style={{ fg: t.textMuted }}>{"queue"}</span>
+            <b>
+              {"enter "}
+              <span style={{ fg: t.textMuted }}>{"queue"}</span>
+            </b>
           </text>
           <text fg={t.text}>
-            {"esc "}
-            <span style={{ fg: t.textMuted }}>{queuedCount > 0 ? "clear queue" : "interrupt"}</span>
+            <b>
+              {"esc "}
+              <span style={{ fg: t.textMuted }}>{queuedCount > 0 ? "clear queue" : "interrupt"}</span>
+            </b>
           </text>
         </>
       ) : showSuggestions ? (
         <>
           <text fg={t.text}>
-            {"tab "}
-            <span style={{ fg: t.textMuted }}>{"accept"}</span>
+            <b>
+              {"tab "}
+              <span style={{ fg: t.textMuted }}>{"accept"}</span>
+            </b>
           </text>
           <text fg={t.text}>
-            {"↑↓ "}
-            <span style={{ fg: t.textMuted }}>{"navigate"}</span>
+            <b>
+              {"↑↓ "}
+              <span style={{ fg: t.textMuted }}>{"navigate"}</span>
+            </b>
           </text>
           <text fg={t.text}>
-            {"esc "}
-            <span style={{ fg: t.textMuted }}>{"dismiss"}</span>
+            <b>
+              {"esc "}
+              <span style={{ fg: t.textMuted }}>{"dismiss"}</span>
+            </b>
           </text>
         </>
       ) : (
         <>
           <text fg={t.text}>
-            {"@ "}
-            <span style={{ fg: t.textMuted }}>{"files"}</span>
+            <b>
+              {"@ "}
+              <span style={{ fg: t.textMuted }}>{"files"}</span>
+            </b>
           </text>
           <text fg={t.text}>
-            {"shift+enter "}
-            <span style={{ fg: t.textMuted }}>{"new line"}</span>
+            <b>
+              {"shift+enter "}
+              <span style={{ fg: t.textMuted }}>{"new line"}</span>
+            </b>
           </text>
           <text fg={t.text}>
-            {"tab "}
-            <span style={{ fg: t.textMuted }}>{"modes"}</span>
+            <b>
+              {"tab "}
+              <span style={{ fg: t.textMuted }}>{"modes"}</span>
+            </b>
           </text>
         </>
       )}
