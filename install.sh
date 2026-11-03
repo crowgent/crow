@@ -29,7 +29,7 @@ Install Crow from GitHub Releases.
 
 Usage:
   curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
-  curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash -s -- --version 1.1.29
+  curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash -s -- --version 1.1.30
   bash install.sh --binary /path/to/crow
 
 Options:
