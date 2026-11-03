@@ -4220,6 +4220,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showModelPicker={showModelPicker}
                 showSandboxPicker={showSandboxPicker}
                 showSlashMenu={showSlashMenu}
+                slashItems={filteredSlashItems}
+                slashMenuIndex={slashMenuIndex}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
                 showAgentsModal={showAgentsModal}
@@ -4293,6 +4295,8 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 showModelPicker={showModelPicker}
                 showSandboxPicker={showSandboxPicker}
                 showSlashMenu={showSlashMenu}
+                slashItems={filteredSlashItems}
+                slashMenuIndex={slashMenuIndex}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
                 showAgentsModal={showAgentsModal}
@@ -4402,16 +4406,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           height={height}
           currentVersion={startupConfig.version}
           latestVersion={updateInfo.latestVersion}
-        />
-      )}
-      {showSlashMenu && (
-        <SlashMenuModal
-          t={t}
-          selectedIndex={slashMenuIndex}
-          width={width}
-          height={height}
-          searchQuery={slashSearchQuery}
-          filteredItems={filteredSlashItems}
         />
       )}
       {showMcpModal && !showMcpEditor && (
@@ -4678,6 +4672,8 @@ function PromptBox({
   showModelPicker,
   showSandboxPicker,
   showSlashMenu,
+  slashItems,
+  slashMenuIndex,
   showPlanQuestions,
   showProviderModal,
   showAgentsModal,
@@ -4703,6 +4699,8 @@ function PromptBox({
   showModelPicker: boolean;
   showSandboxPicker: boolean;
   showSlashMenu: boolean;
+  slashItems: SlashMenuItem[];
+  slashMenuIndex: number;
   showPlanQuestions: boolean;
   showProviderModal: boolean;
   showAgentsModal: boolean;
@@ -4760,6 +4758,7 @@ function PromptBox({
         {showSuggestions && typeahead && (
           <SuggestionOverlay t={t} suggestions={typeahead.suggestions} selectedIndex={typeahead.selectedIndex} />
         )}
+        {showSlashMenu && <SlashMenuPanel t={t} selectedIndex={slashMenuIndex} filteredItems={slashItems} />}
         <box
           border={["left"]}
           customBorderChars={SPLIT}
@@ -5940,19 +5939,13 @@ function UpdateModal({
   );
 }
 
-function SlashMenuModal({
+function SlashMenuPanel({
   t,
   selectedIndex,
-  width,
-  height,
-  searchQuery,
   filteredItems,
 }: {
   t: Theme;
   selectedIndex: number;
-  width: number;
-  height: number;
-  searchQuery: string;
   filteredItems: SlashMenuItem[];
 }) {
   const listRef = useRef<ScrollBoxRenderable>(null);
@@ -5960,66 +5953,33 @@ function SlashMenuModal({
     const item = filteredItems[selectedIndex];
     if (item) listRef.current?.scrollChildIntoView(`slash-${item.id}`);
   }, [selectedIndex, filteredItems]);
-
-  const itemCount = Math.max(filteredItems.length, 1);
-  const contentHeight = itemCount + 5;
-  const maxH = Math.floor(height * 0.6);
-  const panelHeight = Math.min(contentHeight, maxH);
-  const top = bottomAlignedModalTop(height, panelHeight);
-  const overlayBg = "#000000cc" as string;
+  const visible = filteredItems.length === 0 ? 1 : Math.min(filteredItems.length, 10);
   return (
-    <box
-      position="absolute"
-      left={0}
-      top={0}
-      width={width}
-      height={height}
-      alignItems="center"
-      paddingTop={top}
-      backgroundColor={overlayBg}
-    >
-      <box
-        width={Math.min(50, width - 6)}
-        height={panelHeight}
-        backgroundColor={t.backgroundPanel}
-        paddingTop={1}
-        paddingBottom={1}
-        flexDirection="column"
-      >
-        <box flexShrink={0} flexDirection="row" justifyContent="space-between" paddingLeft={2} paddingRight={2}>
-          <text fg={t.primary}>
-            <b>{"Commands"}</b>
-          </text>
-          <text fg={t.textMuted}>{"esc"}</text>
-        </box>
-        <box flexShrink={0} paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
-          <text fg={t.text}>{searchQuery || <span style={{ fg: t.textMuted }}>{"Search..."}</span>}</text>
-        </box>
-        <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
-          {filteredItems.map((item, idx) => (
-            <box
-              key={item.id}
-              id={`slash-${item.id}`}
-              backgroundColor={idx === selectedIndex ? t.selectedBg : undefined}
-              paddingLeft={2}
-              paddingRight={2}
-            >
-              <box flexDirection="row" justifyContent="space-between">
-                <text fg={idx === selectedIndex ? t.selected : t.text}>
-                  {"/"}
-                  {item.label}
-                </text>
-                <text fg={t.textMuted}>{item.description}</text>
-              </box>
+    <box backgroundColor={t.backgroundPanel} flexDirection="column" flexShrink={0} height={visible}>
+      <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
+        {filteredItems.map((item, idx) => (
+          <box
+            key={item.id}
+            id={`slash-${item.id}`}
+            backgroundColor={idx === selectedIndex ? t.selectedBg : undefined}
+            paddingLeft={2}
+            paddingRight={2}
+          >
+            <box flexDirection="row" justifyContent="space-between">
+              <text fg={idx === selectedIndex ? t.selected : t.text}>
+                {"/"}
+                {item.label}
+              </text>
+              <text fg={t.textMuted}>{item.description}</text>
             </box>
-          ))}
-          {filteredItems.length === 0 && (
-            <box paddingLeft={2}>
-              <text fg={t.textMuted}>{"No commands match your search"}</text>
-            </box>
-          )}
-        </scrollbox>
-      </box>
+          </box>
+        ))}
+        {filteredItems.length === 0 && (
+          <box paddingLeft={2}>
+            <text fg={t.textMuted}>{"No commands match your search"}</text>
+          </box>
+        )}
+      </scrollbox>
     </box>
   );
 }

@@ -1,7 +1,7 @@
 export const dark = {
-  background: "#000000",
-  backgroundPanel: "#111111",
-  backgroundElement: "#1a1a1a",
+  background: "#0a0a0a",
+  backgroundPanel: "#141414",
+  backgroundElement: "#1e1e1e",
   border: "#333333",
   borderActive: "#555555",
   text: "#e0e0e0",
