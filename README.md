@@ -24,13 +24,14 @@ OpenAI-compatible provider, or add your own, and code without the bloat.
 > - Subagents from .md files, /agents panel, direct dispatch, child sessions
 > - Shell tool with configured shell, permission checks, file-backed output
 > - Durable loop: retries, step cap, output cap, permissions, crash recovery, token budget
-> - Todo, fetch, questions, worktrees, snapshots, images, /fork, /transfer, /budget
-> - TUI with Thought line, single-row spinner, wrapping navigation
-> - Telegram bridge with rich drafts, plus headless --prompt mode
+> - Todo, fetch, questions, worktrees, snapshots, images, /fork, /transfer, /budget, /session
+> - TUI with Thought line, single-row spinner, wrapping navigation, slash panel, code colours for 33 languages
+> - Telegram bridge with rich drafts, background bridge that survives TUI close, /disconnect, plus headless --prompt mode
+> - In-panel updates: update inside the same panel, then Restart now or Later
 
 ## Requirements
 
-- [Bun](https://bun.sh) (the working runtime for this repo)
+- [Bun](https://bun.sh) (only needed to build from source; the release binary is standalone)
 - A provider API key, entered through `/connect` in the TUI
 
 ## Install
@@ -47,7 +48,7 @@ irm https://raw.githubusercontent.com/crowgent/crow/main/install.ps1 | iex
 
 This installs the latest release binary to `%USERPROFILE%\.crow\bin` and adds it to your user PATH. Restart your terminal, then run `crow`. To reinstall, run the same command again.
 
-This installs the latest release binary. When a directory already on PATH is
+On macOS and Linux, this installs the latest release binary. When a directory already on PATH is
 writable (for example `/usr/local/bin`), the binary goes there so `crow`
 works immediately in the current shell with no manual export. Otherwise the
 binary goes to `~/.crow/bin` and the installer adds that directory to your
@@ -58,7 +59,7 @@ delete `~/.crow` — it holds your providers, keys, permissions, and sessions.
 After reinstalling, check the footer version in the TUI.
 
 ```sh
-rm -f /root/.crow/bin/crow /usr/local/bin/crow
+rm -f ~/.crow/bin/crow /usr/local/bin/crow
 curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
 ```
 
