@@ -4234,7 +4234,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               />
             </box>
           </box>
-          <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
+          <box paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} flexDirection="row" flexShrink={0}>
             <text fg={t.textDim}>
               <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
             </text>
@@ -4313,7 +4313,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               </text>
             </box>
           )}
-          <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
+          <box paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1} flexDirection="row" flexShrink={0}>
             <text fg={t.textDim}>
               <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
             </text>
