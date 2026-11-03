@@ -25,6 +25,9 @@ const CODE_LANG_ALIASES: Record<string, string> = {
   rb: "ruby",
   yml: "yaml",
   hs: "haskell",
+  udiff: "diff",
+  patch: "diff",
+  makefile: "make",
 };
 
 function normalizeCodeFenceLanguages(content: string): string {

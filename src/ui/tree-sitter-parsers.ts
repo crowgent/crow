@@ -113,6 +113,81 @@ export const EXTRA_PARSERS: ExtraParser[] = [
     wasm: release("tree-sitter/tree-sitter-scala", "v0.26.4", "tree-sitter-scala.wasm"),
     highlights: ["https://github.com/tree-sitter/tree-sitter-scala/raw/refs/heads/master/queries/highlights.scm"],
   },
+  {
+    filetype: "vue",
+    wasm: release("anomalyco/tree-sitter-vue", "v0.1.2", "tree-sitter-vue.wasm"),
+    highlights: [
+      "https://raw.githubusercontent.com/anomalyco/tree-sitter-vue/v0.1.2/queries/html_tags/highlights.scm",
+      "https://raw.githubusercontent.com/anomalyco/tree-sitter-vue/v0.1.2/queries/vue/highlights.scm",
+    ],
+  },
+  {
+    filetype: "hcl",
+    wasm: release("tree-sitter-grammars/tree-sitter-hcl", "v1.2.0", "tree-sitter-hcl.wasm"),
+    highlights: [nvim("hcl")],
+  },
+  {
+    filetype: "julia",
+    wasm: release("tree-sitter/tree-sitter-julia", "v0.23.1", "tree-sitter-julia.wasm"),
+    highlights: [nvim("julia")],
+  },
+  {
+    filetype: "ocaml",
+    wasm: release("tree-sitter/tree-sitter-ocaml", "v0.24.2", "tree-sitter-ocaml.wasm"),
+    highlights: [nvim("ocaml")],
+  },
+  {
+    filetype: "clojure",
+    wasm: release("anomalyco/tree-sitter-clojure", "v0.0.1", "tree-sitter-clojure.wasm"),
+    highlights: [nvim("clojure")],
+  },
+  {
+    filetype: "nix",
+    wasm: "https://github.com/ast-grep/ast-grep.github.io/raw/40b84530640aa83a0d34a20a2b0623d7b8e5ea97/website/public/parsers/tree-sitter-nix.wasm",
+    highlights: [nvim("nix")],
+  },
+  {
+    filetype: "diff",
+    wasm: release("tree-sitter-grammars/tree-sitter-diff", "v0.1.0", "tree-sitter-diff.wasm"),
+    highlights: [
+      "https://raw.githubusercontent.com/tree-sitter-grammars/tree-sitter-diff/2520c3f934b3179bb540d23e0ef45f75304b5fed/queries/highlights.scm",
+    ],
+  },
+  {
+    filetype: "elixir",
+    wasm: release("elixir-lang/tree-sitter-elixir", "v0.3.5", "tree-sitter-elixir.wasm"),
+    highlights: [nvim("elixir")],
+  },
+  {
+    filetype: "fsharp",
+    wasm: release("ionide/tree-sitter-fsharp", "0.3.0", "tree-sitter-fsharp.wasm"),
+    highlights: [nvim("fsharp")],
+  },
+  {
+    filetype: "r",
+    wasm: release("r-lib/tree-sitter-r", "v1.2.0", "tree-sitter-r.wasm"),
+    highlights: [nvim("r")],
+  },
+  {
+    filetype: "make",
+    wasm: release("tree-sitter-grammars/tree-sitter-make", "v1.1.1", "tree-sitter-make.wasm"),
+    highlights: [nvim("make")],
+  },
+  {
+    filetype: "vim",
+    wasm: release("tree-sitter-grammars/tree-sitter-vim", "v0.8.1", "tree-sitter-vim.wasm"),
+    highlights: [nvim("vim")],
+  },
+  {
+    filetype: "xml",
+    wasm: release("tree-sitter-grammars/tree-sitter-xml", "v0.7.0", "tree-sitter-xml.wasm"),
+    highlights: [nvim("xml")],
+  },
+  {
+    filetype: "agda",
+    wasm: release("tree-sitter/tree-sitter-agda", "v1.3.3", "tree-sitter-agda.wasm"),
+    highlights: [nvim("agda")],
+  },
 ];
 
 let registered = false;
