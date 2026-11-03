@@ -183,7 +183,7 @@ const SPLIT = {
   rightT: "",
 };
 const _SPLIT_END = { ...SPLIT, bottomLeft: "╹" };
-const EDGE = { ...SPLIT, bottomLeft: "╹", horizontal: "▀" };
+
 const _EMPTY = {
   topLeft: "",
   bottomLeft: "",
@@ -4797,7 +4797,16 @@ function PromptBox({
               onPaste={onPaste as unknown as (event: PasteEvent) => void}
             />
           </box>
-          <box flexDirection="row" justifyContent="space-between" alignItems="center" paddingTop={1} flexShrink={0}>
+        </box>
+        <box
+          backgroundColor={t.backgroundElement}
+          paddingLeft={3}
+          paddingRight={2}
+          paddingTop={1}
+          flexDirection="column"
+          flexShrink={0}
+        >
+          <box flexDirection="row" justifyContent="space-between" alignItems="center">
             <box flexDirection="row" gap={1} alignItems="center">
               {isProcessing ? <DotSpinner t={t} /> : null}
               <text fg={modeInfo.color}>{modeInfo.label}</text>
@@ -4813,7 +4822,6 @@ function PromptBox({
             </box>
           </box>
         </box>
-        <box border={["bottom"]} customBorderChars={EDGE} borderColor={t.backgroundElement} height={1} flexShrink={0} />
       </box>
     </box>
   );
