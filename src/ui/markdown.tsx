@@ -61,7 +61,7 @@ function buildSyntaxStyle(t: Theme): SyntaxStyle {
   return SyntaxStyle.fromStyles({
     default: { fg: RGBA.fromHex(t.text) },
     "markup.heading": { fg: RGBA.fromHex(t.mdHeading), bold: true },
-    "markup.heading.1": { fg: RGBA.fromHex(t.mdHeading), bold: true },
+    "markup.heading.1": { fg: RGBA.fromHex(t.mdHeading), bold: true, underline: true },
     "markup.heading.2": { fg: RGBA.fromHex(t.mdHeading), bold: true },
     "markup.heading.3": { fg: RGBA.fromHex(t.mdHeading), bold: true },
     "markup.bold": { fg: RGBA.fromHex(t.mdBold), bold: true },

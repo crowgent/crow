@@ -111,6 +111,7 @@ import {
 import { buildScheduleBrowseRows, ScheduleBrowserModal } from "./schedule-modal";
 import { filterSessionRows, SessionModal } from "./session-modal";
 import { filterSlashMenuItems, SLASH_MENU_ITEMS, type SlashMenuItem } from "./slash-menu";
+import { stripAnsiForDisplay } from "./strip-ansi";
 import {
   buildAssistantEntry,
   buildToolResultEntry,
@@ -5259,7 +5260,7 @@ function MessageView({
           <InlineTool t={t} pending={false}>
             {trunc(name === "bash" ? args : `${name} ${args}`, 80)}
           </InlineTool>
-          <ToolOutputView t={t} content={entry.content} />
+          <ToolOutputView t={t} content={entry.content} tail={name === "shell" || name === "bash"} />
         </box>
       );
     }
@@ -5713,7 +5714,7 @@ function formatScheduleDetails(schedule: StoredSchedule, daemonStatus: ScheduleD
 }
 
 function ProcessLogsView({ t, content }: { t: Theme; content: string }) {
-  const lines = content.split("\n");
+  const lines = stripAnsiForDisplay(content).split("\n");
   const header = lines[0] || "";
   const body = lines.slice(1).join("\n").trim();
 
@@ -5740,10 +5741,10 @@ function truncateBlock(text: string, maxLines: number): string {
   return [...lines.slice(0, maxLines), `… ${lines.length - maxLines} more lines`].join("\n");
 }
 
-function ToolOutputView({ t, content }: { t: Theme; content: string }) {
+function ToolOutputView({ t, content, tail }: { t: Theme; content: string; tail?: boolean }) {
   const [expanded, setExpanded] = useState(false);
-  const lines = content.split("\n");
-  const shown = expanded ? lines : lines.slice(0, 30);
+  const lines = stripAnsiForDisplay(content).split("\n");
+  const shown = expanded ? lines : tail ? lines.slice(-10) : lines.slice(0, 30);
   const extra = lines.length - shown.length;
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: click expands or collapses the tool output
@@ -5755,7 +5756,11 @@ function ToolOutputView({ t, content }: { t: Theme; content: string }) {
       onMouseUp={extra > 0 || expanded ? () => setExpanded((value) => !value) : undefined}
     >
       <text fg={t.textMuted}>{shown.join("\n")}</text>
-      {extra > 0 && <text fg={t.textDim}>… {extra} more lines not shown · click to expand</text>}
+      {extra > 0 && (
+        <text fg={t.textDim}>
+          {tail ? `… ${extra} earlier lines · click to expand` : `… ${extra} more lines not shown · click to expand`}
+        </text>
+      )}
       {expanded && <text fg={t.textDim}>· click to collapse</text>}
     </box>
   );
@@ -5768,7 +5773,7 @@ function ToolTextOutputView({ t, label, content }: { t: Theme; label: string; co
         {label}
       </InlineTool>
       <box paddingLeft={5} marginTop={1} flexShrink={0}>
-        <Markdown content={content} t={t} />
+        <Markdown content={stripAnsiForDisplay(content)} t={t} />
       </box>
     </box>
   );

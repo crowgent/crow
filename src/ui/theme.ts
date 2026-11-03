@@ -25,7 +25,7 @@ export const dark = {
   diffHeaderFg: "#888888",
   diffSeparator: "#1a1a1a",
   diffSeparatorFg: "#555555",
-  mdHeading: "#e0e0e0",
+  mdHeading: "#61afef",
   mdBold: "#e8a465",
   mdItalic: "#e5c07b",
   mdCode: "#6abf6a",
