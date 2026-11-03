@@ -4240,16 +4240,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               />
             </box>
           </box>
-          <box
-            backgroundColor={t.backgroundElement}
-            paddingLeft={2}
-            paddingRight={2}
-            paddingTop={1}
-            paddingBottom={1}
-            flexDirection="row"
-            justifyContent="space-between"
-            flexShrink={0}
-          >
+          <box paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="space-between" flexShrink={0}>
             <box flexDirection="row">
               <text fg={t.textDim}>
                 <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
@@ -4260,17 +4251,15 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 </text>
               ) : null}
             </box>
-            {contextStats ? (
-              <box flexDirection="row">
+            <box flexDirection="row" gap={2}>
+              {contextStats ? (
                 <text fg={t.textMuted}>
                   <b>
                     {`${formatCompactTokens(contextStats.usedTokens)} (${Math.round(contextStats.ratioUsed * 100)}%)`}
                     {sessionCostMicros > 0 ? ` · ${formatCostUsd(sessionCostMicros)}` : ""}
                   </b>
                 </text>
-              </box>
-            ) : null}
-            <box flexDirection="row">
+              ) : null}
               <FooterHints
                 t={t}
                 isProcessing={isProcessing}
@@ -4342,16 +4331,7 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               </text>
             </box>
           )}
-          <box
-            backgroundColor={t.backgroundElement}
-            paddingLeft={2}
-            paddingRight={2}
-            paddingTop={1}
-            paddingBottom={1}
-            flexDirection="row"
-            justifyContent="space-between"
-            flexShrink={0}
-          >
+          <box paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="space-between" flexShrink={0}>
             <box flexDirection="row">
               <text fg={t.textDim}>
                 <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
@@ -4362,25 +4342,21 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
                 </text>
               ) : null}
             </box>
-            {contextStats ? (
-              <box flexDirection="row">
+            <box flexDirection="row" gap={2}>
+              {contextStats ? (
                 <text fg={t.textMuted}>
                   <b>
                     {`${formatCompactTokens(contextStats.usedTokens)} (${Math.round(contextStats.ratioUsed * 100)}%)`}
                     {sessionCostMicros > 0 ? ` · ${formatCostUsd(sessionCostMicros)}` : ""}
                   </b>
                 </text>
-              </box>
-            ) : null}
-            <box flexDirection="row">
-              <box paddingRight={2}>
-                <FooterHints
-                  t={t}
-                  isProcessing={isProcessing}
-                  queuedCount={queuedMessages.length}
-                  showSuggestions={typeahead?.visible ?? false}
-                />
-              </box>
+              ) : null}
+              <FooterHints
+                t={t}
+                isProcessing={isProcessing}
+                queuedCount={queuedMessages.length}
+                showSuggestions={typeahead?.visible ?? false}
+              />
               <text fg={t.textDim}>
                 <b>{`v${startupConfig.version}`}</b>
               </text>
