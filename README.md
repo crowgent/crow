@@ -39,6 +39,14 @@ OpenAI-compatible provider, or add your own, and code without the bloat.
 curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
 ```
 
+On Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/crowgent/crow/main/install.ps1 | iex
+```
+
+This installs the latest release binary to `%USERPROFILE%\.crow\bin` and adds it to your user PATH. Restart your terminal, then run `crow`. To reinstall, run the same command again.
+
 This installs the latest release binary. When a directory already on PATH is
 writable (for example `/usr/local/bin`), the binary goes there so `crow`
 works immediately in the current shell with no manual export. Otherwise the
