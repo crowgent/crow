@@ -4234,16 +4234,17 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               />
             </box>
           </box>
-          <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
-            <text fg={t.textDim}>
-              <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
-            </text>
-            {sandboxMode === "shuru" ? (
-              <text fg="#f97316">
-                <b>{" · sandbox"}</b>
+          <box paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="center" gap={4} flexShrink={0}>
+            <box flexDirection="row" alignItems="center" height={1}>
+              <text fg={t.textDim}>
+                <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
               </text>
-            ) : null}
-            <box flexGrow={1} />
+              {sandboxMode === "shuru" ? (
+                <text fg="#f97316">
+                  <b>{" · sandbox"}</b>
+                </text>
+              ) : null}
+            </box>
             <FooterHints
               t={t}
               isProcessing={isProcessing}
@@ -4313,24 +4314,23 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
               </text>
             </box>
           )}
-          <box paddingLeft={2} paddingRight={2} flexDirection="row" flexShrink={0}>
-            <text fg={t.textDim}>
-              <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
-            </text>
-            {sandboxMode === "shuru" ? (
-              <text fg="#f97316">
-                <b>{" · sandbox"}</b>
+          <box paddingLeft={2} paddingRight={2} flexDirection="row" justifyContent="center" gap={4} flexShrink={0}>
+            <box flexDirection="row" alignItems="center" height={1}>
+              <text fg={t.textDim}>
+                <b>{agent.getCwd().replace(os.homedir(), "~")}</b>
               </text>
-            ) : null}
-            <box flexGrow={1} />
-            <box paddingRight={2}>
-              <FooterHints
-                t={t}
-                isProcessing={isProcessing}
-                queuedCount={queuedMessages.length}
-                showSuggestions={typeahead?.visible ?? false}
-              />
+              {sandboxMode === "shuru" ? (
+                <text fg="#f97316">
+                  <b>{" · sandbox"}</b>
+                </text>
+              ) : null}
             </box>
+            <FooterHints
+              t={t}
+              isProcessing={isProcessing}
+              queuedCount={queuedMessages.length}
+              showSuggestions={typeahead?.visible ?? false}
+            />
             <text fg={t.textDim}>
               <b>{`v${startupConfig.version}`}</b>
             </text>
@@ -4772,14 +4772,7 @@ function PromptBox({
               />
             </box>
           </box>
-          <box
-            flexDirection="row"
-            justifyContent="space-between"
-            alignItems="center"
-            paddingTop={1}
-            height={1}
-            flexShrink={0}
-          >
+          <box flexDirection="row" justifyContent="space-between" alignItems="center" height={1} flexShrink={0}>
             <box flexDirection="row" gap={1} alignItems="center" height={1}>
               {isProcessing ? <DotSpinner t={t} /> : null}
               <text fg={t.text}>{modelInfo?.name || model || "No provider selected"}</text>
