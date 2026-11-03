@@ -40,6 +40,29 @@ Options:
 EOF
 }
 
+require_tools() {
+  local missing=() raw_os hint
+  for tool in uname mktemp awk grep sed; do
+    command -v "$tool" >/dev/null 2>&1 || missing+=("$tool")
+  done
+  if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+    missing+=("curl or wget")
+  fi
+  if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1 && ! command -v openssl >/dev/null 2>&1; then
+    missing+=("sha256sum, shasum, or openssl")
+  fi
+  if [[ "${#missing[@]}" -eq 0 ]]; then return; fi
+  raw_os=$(uname -s 2>/dev/null || echo "unknown")
+  case "$raw_os" in
+    MINGW*|MSYS*|CYGWIN*) hint="Install Git for Windows, which provides bash, curl, and the other tools." ;;
+    Darwin*) hint="Install the Xcode Command Line Tools with: xcode-select --install" ;;
+    *) hint="Install the missing tools with your OS package manager." ;;
+  esac
+  echo "Missing required tool(s): ${missing[*]}" >&2
+  echo "$hint" >&2
+  exit 1
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
@@ -73,6 +96,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+require_tools
+
 mkdir -p "$USER_DIR"
 chmod 700 "$USER_DIR"
 if [[ "$INSTALL_DIR" == "${USER_DIR}/bin" ]]; then
@@ -88,7 +113,9 @@ resolve_target() {
     Linux*)  OS="linux" ;;
     MINGW*|MSYS*|CYGWIN*) OS="windows" ;;
     *)
-      echo "Unsupported OS: ${raw_os}" >&2
+      echo "Unsupported OS: ${raw_os}." >&2
+      echo "Crow release binaries are built for macOS (darwin-arm64), Linux (linux-x64), and Windows (windows-x64)." >&2
+      echo "See https://github.com/${REPO}/releases or build from source: git clone https://github.com/${REPO}.git && bun install && bun run build" >&2
       exit 1
       ;;
   esac
@@ -96,9 +123,10 @@ resolve_target() {
   arch=$(uname -m)
   case "$arch" in
     arm64|aarch64) ARCH="arm64" ;;
-    x86_64|amd64)  ARCH="x64" ;;
+    x86_64|amd64|x64)  ARCH="x64" ;;
     *)
-      echo "Unsupported architecture: ${arch}" >&2
+      echo "Unsupported architecture: ${arch}." >&2
+      echo "Crow release binaries are built for x64 and arm64 only." >&2
       exit 1
       ;;
   esac
@@ -106,7 +134,9 @@ resolve_target() {
   case "${OS}-${ARCH}" in
     darwin-arm64|linux-x64|windows-x64) ;;
     *)
-      echo "Unsupported platform: ${OS}-${ARCH}" >&2
+      echo "No Crow release binary for ${OS}-${ARCH}." >&2
+      echo "Supported targets: darwin-arm64, linux-x64, windows-x64." >&2
+      echo "Build from source instead: git clone https://github.com/${REPO}.git && bun install && bun run build" >&2
       exit 1
       ;;
   esac
@@ -272,6 +302,23 @@ EOF
   esac
 }
 
+fetch_url() {
+  local url="$1" output="${2:-}"
+  if command -v curl >/dev/null 2>&1; then
+    if [[ -n "$output" ]]; then
+      curl -fSL "$url" -o "$output"
+    else
+      curl -fsSL "$url"
+    fi
+    return
+  fi
+  if [[ -n "$output" ]]; then
+    wget -q "$url" -O "$output"
+  else
+    wget -qO- "$url"
+  fi
+}
+
 resolve_release_version() {
   if [[ -n "$requested_version" ]]; then
     RESOLVED_VERSION="${requested_version}"
@@ -280,7 +327,7 @@ resolve_release_version() {
   fi
 
   local response tag
-  if ! response=$(curl -fsSL "${RELEASES_API}/latest"); then
+  if ! response=$(fetch_url "${RELEASES_API}/latest"); then
     echo "Failed to fetch the latest Crow release from ${RELEASES_API}/latest." >&2
     echo "No release may be published yet. See https://github.com/${REPO}/releases" >&2
     exit 1
@@ -307,8 +354,8 @@ install_downloaded_release() {
   checksum_file="${tmp_dir}/checksums.txt"
 
   echo "Downloading ${ASSET_NAME}..."
-  curl -fSL "${RELEASE_BASE_URL}/${ASSET_NAME}" -o "$binary_file"
-  curl -fsSL "${RELEASE_BASE_URL}/checksums.txt" -o "$checksum_file"
+  fetch_url "${RELEASE_BASE_URL}/${ASSET_NAME}" "$binary_file"
+  fetch_url "${RELEASE_BASE_URL}/checksums.txt" "$checksum_file"
   verify_checksum "$binary_file" "$checksum_file"
 
   cp "$binary_file" "${INSTALL_DIR}/${BINARY_NAME}"
@@ -351,6 +398,13 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
   echo "will say 'command not found' until you run one of these:"
   echo "  export PATH=${INSTALL_DIR}:\$PATH"
   echo "or start a new shell."
+  echo ""
+fi
+if [[ "$TARGET" == windows-* ]]; then
+  echo "Windows note: run Crow from Git Bash (or Windows Terminal with a Git Bash profile)."
+  echo "For PowerShell or Command Prompt, add ${INSTALL_DIR} to your Windows PATH manually"
+  echo "(System > Environment Variables), or download crow-windows-x64.exe from"
+  echo "https://github.com/${REPO}/releases and place it in a folder already on PATH."
   echo ""
 fi
 echo "Run:"
