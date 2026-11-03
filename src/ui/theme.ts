@@ -61,4 +61,13 @@ export const dark = {
   queueBg: "#222222",
 } as const;
 
+export function mixHex(a: string, b: string): string {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  const mix = (x: number, y: number) =>
+    Math.round((x + y) / 2)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${mix(channel(a, 1), channel(b, 1))}${mix(channel(a, 3), channel(b, 3))}${mix(channel(a, 5), channel(b, 5))}`;
+}
+
 export type Theme = typeof dark;

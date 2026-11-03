@@ -123,7 +123,7 @@ import {
   replaceTurnEntries,
 } from "./telegram-turn-ui";
 import { getCompactTuiSelectionText } from "./terminal-selection-text";
-import { dark, type Theme } from "./theme";
+import { dark, mixHex, type Theme } from "./theme";
 
 const CROW_LOGO = [
   "██████  ██████  ██████  ██      ██",
@@ -4243,7 +4243,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           <box
             paddingLeft={2}
             paddingRight={2}
-            paddingTop={1}
             paddingBottom={1}
             flexDirection="row"
             justifyContent="space-between"
@@ -4342,7 +4341,6 @@ export function App({ agent, startupConfig, initialMessage, onExit }: AppProps) 
           <box
             paddingLeft={2}
             paddingRight={2}
-            paddingTop={1}
             paddingBottom={1}
             flexDirection="row"
             justifyContent="space-between"
@@ -4765,7 +4763,7 @@ function PromptBox({
         <box
           border={["left"]}
           customBorderChars={SPLIT}
-          borderColor={modeInfo.color}
+          borderColor={mixHex(t.border, modeInfo.color)}
           paddingLeft={2}
           paddingRight={2}
           paddingTop={1}
