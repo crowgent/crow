@@ -78,6 +78,7 @@ import { applyModelConstraints, buildSystemPrompt } from "./prompts";
 import { sanitizeModelMessages } from "./reasoning";
 import { computeRetryDelayMs, isRetryableError, MAX_MODEL_RETRIES, sleepWithSignal } from "./retry";
 import { ThoughtTracker } from "./thought";
+import { describesUntakenAction, TOOL_CALL_NUDGE } from "./tool-nudge";
 import { buildVisionUserMessages } from "./vision-input";
 
 export interface LoopContext {
@@ -514,6 +515,7 @@ export async function* processMessage(
   ctx.planContext = null;
   let attemptedOverflowRecovery = false;
   let modelRetryAttempt = 0;
+  let toolCallNudgeUsed = false;
 
   if (ctx.batchApi) {
     try {
@@ -815,6 +817,24 @@ export async function* processMessage(
                   );
                 }
               } catch {}
+            }
+            if (
+              !toolCallNudgeUsed &&
+              ctx.mode === "agent" &&
+              runtime.modelInfo?.supportsClientTools !== false &&
+              activeToolCalls.length === 0 &&
+              describesUntakenAction(assistantText)
+            ) {
+              toolCallNudgeUsed = true;
+              ctx.messages.push({ role: "user", content: TOOL_CALL_NUDGE });
+              ctx.messageSeqs.push(null);
+              ctx.deleteTurnDraft();
+              thoughtTracker.reset();
+              yield {
+                type: "content",
+                content: "\n\n[No tool call was made — retrying with an explicit tool-call request…]",
+              };
+              continue;
             }
             appendCompletedTurn(ctx, userModelMessage, savedMessages, thought, turnUserSeq);
             ctx.deleteTurnDraft();

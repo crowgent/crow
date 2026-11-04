@@ -33,9 +33,16 @@ import { type AgentDefinition, isDelegatable } from "../utils/agent-files";
 import { type CustomSubagentConfig, loadValidSubAgents } from "../utils/settings";
 import type { CrowProvider } from "./client";
 
+export interface QuestionOption {
+  label: string;
+  description?: string;
+}
+
 export interface QuestionItem {
+  header?: string;
   question: string;
-  options: string[];
+  options: QuestionOption[];
+  multiple?: boolean;
 }
 
 export type QuestionResolver = (questions: QuestionItem[], abortSignal?: AbortSignal) => Promise<string[]>;
@@ -163,7 +170,7 @@ export function createTools(
     }),
 
     shell: tool({
-      description: `Execute a shell command and return its output. Commands run on Linux using ${shellName}. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately with a shell ID and stream output to a file, and the session is notified when they complete.`,
+      description: `Execute a shell command and return its output. Call this tool to run a command instead of describing it in prose. Commands run on Linux using ${shellName}. Quote file paths containing spaces or special characters. Prefer dedicated tools over shell commands when possible. When output is large, the full result is saved to a file and a truncated preview is returned. Commands accept an optional timeout, background commands have no timeout by default. Background commands return immediately with a shell ID and stream output to a file, and the session is notified when they complete. Never poll a background command for completion.`,
       inputSchema: z.object({
         command: z.string().describe("Shell command string to execute"),
         workdir: z
@@ -431,13 +438,22 @@ export function createTools(
 
     question: tool({
       description:
-        "Ask the user one or more multiple-choice questions and wait for their answers. Each question must include 2 or more options for the user to pick from. Use when a choice blocks progress. In unattended sessions this tool is unavailable.",
+        "Ask the user one or more questions and wait for their answers. Ask through this tool instead of listing options in prose. Each question must include 2 or more options, each with a label and an optional description; put the recommended option first with a (Recommended) suffix on its label. Set multiple when the user may pick more than one option, and header for a short heading shown above the question. A custom-answer row is added automatically; never add one yourself. Use when a choice blocks progress. In unattended sessions this tool is unavailable.",
       inputSchema: z.object({
         questions: z
           .array(
             z.object({
+              header: z.string().optional(),
               question: z.string(),
-              options: z.array(z.string()).min(2),
+              options: z
+                .array(
+                  z.object({
+                    label: z.string(),
+                    description: z.string().optional(),
+                  }),
+                )
+                .min(2),
+              multiple: z.boolean().optional(),
             }),
           )
           .min(1),
@@ -454,7 +470,7 @@ export function createTools(
           if (answers.length === 0) return { success: false, output: "The user declined to answer." };
           return {
             success: true,
-            output: questions.map((item, i) => `Q: ${item.question}\nA: ${answers[i] ?? "(no answer)"}`).join("\n"),
+            output: questions.map((item, i) => `Q: ${item.question}\nA: ${answers[i] ?? "Unanswered"}`).join("\n"),
           };
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);

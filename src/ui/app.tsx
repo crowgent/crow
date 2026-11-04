@@ -100,7 +100,7 @@ import { BtwOverlay, type BtwState } from "./components/btw-overlay.js";
 import { SuggestionOverlay } from "./components/SuggestionOverlay.js";
 import { formatCompactTokens, formatCostUsd } from "./footer-format";
 import { type TypeaheadState, useTypeahead } from "./hooks/useTypeahead.js";
-import { Markdown } from "./markdown";
+import { buildSyntaxStyle, filetypeFromPath, Markdown, useTreeSitterClient } from "./markdown";
 import { buildMcpBrowseRows, McpBrowserModal, McpEditorModal } from "./mcp-modal";
 import { createEmptyMcpEditorDraft, type McpEditorDraft, type McpEditorField } from "./mcp-modal-types";
 import {
@@ -563,13 +563,23 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     };
   }, [agent, advancePermissionQueue]);
   const [pendingQuestion, setPendingQuestion] = useState<{
+    header?: string;
     question: string;
-    options: string[];
+    options: Array<{ label: string; description?: string }>;
+    multiple: boolean;
     selected: number;
+    selectedSet: number[];
+    customText: string | null;
+    validation: string | null;
   } | null>(null);
   const questionQueueRef = useRef<
     Array<{
-      questions: Array<{ question: string; options: string[] }>;
+      questions: Array<{
+        header?: string;
+        question: string;
+        options: Array<{ label: string; description?: string }>;
+        multiple?: boolean;
+      }>;
       answers: string[];
       index: number;
       resolve: (answers: string[]) => void;
@@ -584,7 +594,20 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       return;
     }
     const current = next.questions[next.index];
-    setPendingQuestion(current ? { question: current.question, options: current.options, selected: 0 } : null);
+    setPendingQuestion(
+      current
+        ? {
+            header: current.header,
+            question: current.question,
+            options: current.options,
+            multiple: current.multiple ?? false,
+            selected: 0,
+            selectedSet: [],
+            customText: null,
+            validation: null,
+          }
+        : null,
+    );
   }, []);
   const answerQuestion = useCallback(
     (option: string) => {
@@ -3799,18 +3822,91 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
         return;
       }
       if (pendingQuestion) {
+        if (pendingQuestion.customText !== null) {
+          if (isEscapeKey(key)) {
+            setPendingQuestion((p) => (p ? { ...p, customText: null, validation: null } : p));
+            return;
+          }
+          if (key.name === "return") {
+            const text = pendingQuestion.customText.trim();
+            if (!text) {
+              setPendingQuestion((p) => (p ? { ...p, validation: "Type an answer or press esc to go back." } : p));
+              return;
+            }
+            answerQuestion(text);
+            return;
+          }
+          if (key.name === "backspace") {
+            setPendingQuestion((p) =>
+              p ? { ...p, customText: (p.customText ?? "").slice(0, -1), validation: null } : p,
+            );
+            return;
+          }
+          if (key.sequence && key.sequence.length === 1) {
+            setPendingQuestion((p) =>
+              p ? { ...p, customText: (p.customText ?? "") + key.sequence, validation: null } : p,
+            );
+            return;
+          }
+          return;
+        }
         if (isEscapeKey(key)) {
           declineQuestion();
           return;
         }
+        const questionRowCount = pendingQuestion.options.length + 1;
         if (key.name === "up" || key.name === "down") {
           setPendingQuestion((p) =>
-            p ? { ...p, selected: wrapListIndex(p.selected, p.options.length, key.name === "down" ? 1 : -1) } : p,
+            p
+              ? {
+                  ...p,
+                  selected: wrapListIndex(p.selected, questionRowCount, key.name === "down" ? 1 : -1),
+                  validation: null,
+                }
+              : p,
           );
           return;
         }
+        if (key.name === "tab") {
+          answerQuestion("Unanswered");
+          return;
+        }
+        if (
+          key.name === "space" &&
+          pendingQuestion.multiple &&
+          pendingQuestion.selected < pendingQuestion.options.length
+        ) {
+          setPendingQuestion((p) => {
+            if (!p) return p;
+            const nextSet = new Set(p.selectedSet);
+            if (nextSet.has(p.selected)) {
+              nextSet.delete(p.selected);
+            } else {
+              nextSet.add(p.selected);
+            }
+            return { ...p, selectedSet: [...nextSet], validation: null };
+          });
+          return;
+        }
         if (key.name === "return") {
-          answerQuestion(pendingQuestion.options[pendingQuestion.selected] ?? "");
+          if (pendingQuestion.selected >= pendingQuestion.options.length) {
+            setPendingQuestion((p) => (p ? { ...p, customText: "", validation: null } : p));
+            return;
+          }
+          if (pendingQuestion.multiple) {
+            if (pendingQuestion.selectedSet.length === 0) {
+              setPendingQuestion((p) => (p ? { ...p, validation: "Select at least one option." } : p));
+              return;
+            }
+            answerQuestion(
+              pendingQuestion.selectedSet
+                .map((i) => pendingQuestion.options[i]?.label ?? "")
+                .filter(Boolean)
+                .join(", "),
+            );
+            return;
+          }
+          answerQuestion(pendingQuestion.options[pendingQuestion.selected]?.label ?? "");
           return;
         }
         return;
@@ -5322,6 +5418,21 @@ function MessageView({
         return <MediaToolResultView t={t} label={toolLabel(entry.toolCall!)} toolResult={entry.toolResult!} />;
       }
 
+      if (name === "write_file") {
+        const writtenPath = diff?.filePath || tryParseArg(entry.toolCall, "path") || args;
+        const writtenContent = tryParseArg(entry.toolCall, "content");
+        if (writtenContent) {
+          return (
+            <box gap={0} flexDirection="column">
+              <WrittenFileView t={t} filePath={writtenPath} content={writtenContent} />
+              {(entry.toolResult?.lspDiagnostics?.length ?? 0) > 0 && (
+                <LspDiagnosticsView t={t} diagnostics={entry.toolResult?.lspDiagnostics ?? []} />
+              )}
+            </box>
+          );
+        }
+      }
+
       if (name === "write_file" || name === "edit_file") {
         const filePath = diff?.filePath || tryParseArg(entry.toolCall, "path") || args;
         const label = name === "write_file" ? `Write ${filePath}` : `Edit ${filePath}`;
@@ -5896,6 +6007,36 @@ function ToolTextOutputView({ t, label, content }: { t: Theme; label: string; co
       <box paddingLeft={5} marginTop={1} flexShrink={0}>
         <Markdown content={stripAnsiForDisplay(content)} t={t} />
       </box>
+    </box>
+  );
+}
+
+const WRITTEN_FILE_MAX_LINES = 200;
+
+function WrittenFileView({ t, filePath, content }: { t: Theme; filePath: string; content: string }) {
+  const syntaxStyle = useMemo(() => buildSyntaxStyle(t), [t]);
+  const { client: tsClient, gen: parserGen } = useTreeSitterClient();
+  const lines = content.split("\n");
+  const shown = lines.slice(0, WRITTEN_FILE_MAX_LINES);
+  const extra = lines.length - shown.length;
+  return (
+    <box paddingLeft={3} marginTop={1} flexShrink={0} flexDirection="column">
+      <text>
+        <span style={{ fg: t.textMuted }}>{"# Wrote "}</span>
+        <span style={{ fg: t.text }}>{filePath}</span>
+      </text>
+      <box marginTop={1} paddingLeft={2}>
+        <line-number key={tsClient ? `ts-${parserGen}` : "plain"} fg={t.textMuted} minWidth={3} paddingRight={1}>
+          <code
+            content={shown.join("\n")}
+            filetype={filetypeFromPath(filePath)}
+            syntaxStyle={syntaxStyle}
+            treeSitterClient={tsClient ?? undefined}
+            conceal={false}
+          />
+        </line-number>
+      </box>
+      {extra > 0 && <text fg={t.textDim}>{`… ${extra} more lines not shown`}</text>}
     </box>
   );
 }
@@ -6761,11 +6902,18 @@ function QuestionPanel({
 }: {
   t: Theme;
   question: {
+    header?: string;
     question: string;
-    options: string[];
+    options: Array<{ label: string; description?: string }>;
+    multiple: boolean;
     selected: number;
+    selectedSet: number[];
+    customText: string | null;
+    validation: string | null;
   };
 }) {
+  const customRowIndex = question.options.length;
+  const typingCustom = question.customText !== null;
   return (
     <box
       flexDirection="column"
@@ -6791,41 +6939,106 @@ function QuestionPanel({
       paddingBottom={1}
       backgroundColor={t.backgroundPanel}
     >
-      <text>
-        <span style={{ fg: t.planTitle ?? t.primary }}>
-          <b>{"Question"}</b>
-        </span>
-      </text>
+      {question.header ? (
+        <text>
+          <span style={{ fg: t.planTitle ?? t.primary }}>
+            <b>{question.header}</b>
+          </span>
+        </text>
+      ) : (
+        <text>
+          <span style={{ fg: t.planTitle ?? t.primary }}>
+            <b>{"Question"}</b>
+          </span>
+        </text>
+      )}
       <box marginTop={1}>
         <text>
           <span style={{ fg: t.text }}>{question.question}</span>
         </text>
       </box>
       <box marginTop={1} flexDirection="column">
-        {question.options.map((label, i) => {
-          const isSel = i === question.selected;
+        {question.options.map((option, i) => {
+          const isCursor = i === question.selected;
+          const isChecked = question.selectedSet.includes(i);
+          const prefix = question.multiple ? (isChecked ? "[x] " : "[ ] ") : isCursor ? "> " : "  ";
+          const indent = question.multiple ? "    " : "  ";
           return (
-            <text key={label}>
-              <span style={{ fg: isSel ? "#22c55e" : t.textMuted }}>{isSel ? "> " : "  "}</span>
-              <span style={{ fg: isSel ? t.text : t.textMuted }}>{isSel ? <b>{label}</b> : label}</span>
-            </text>
+            <box key={option.label} flexDirection="column">
+              <text>
+                <span style={{ fg: isCursor ? "#22c55e" : t.textMuted }}>{prefix}</span>
+                <span style={{ fg: isCursor ? t.text : t.textMuted }}>
+                  {isCursor ? <b>{option.label}</b> : option.label}
+                </span>
+              </text>
+              {option.description ? (
+                <text>
+                  <span style={{ fg: t.textMuted }}>{`${indent}${option.description}`}</span>
+                </text>
+              ) : null}
+            </box>
           );
         })}
+        <text>
+          <span style={{ fg: question.selected === customRowIndex ? "#22c55e" : t.textMuted }}>
+            {question.selected === customRowIndex ? "> " : "  "}
+          </span>
+          {typingCustom ? (
+            <span style={{ fg: t.text }}>
+              {question.customText}
+              {"█"}
+            </span>
+          ) : (
+            <span style={{ fg: question.selected === customRowIndex ? t.text : t.textMuted }}>
+              {question.selected === customRowIndex ? <b>{"Type your own answer…"}</b> : "Type your own answer…"}
+            </span>
+          )}
+        </text>
       </box>
-      <box flexDirection="row" gap={3} marginTop={1} flexShrink={0}>
-        <text>
-          <span style={{ fg: t.text }}>{"↑↓"}</span>
-          <span style={{ fg: t.textMuted }}>{" select"}</span>
-        </text>
-        <text>
-          <span style={{ fg: t.text }}>{"enter"}</span>
-          <span style={{ fg: t.textMuted }}>{" confirm"}</span>
-        </text>
-        <text>
-          <span style={{ fg: t.text }}>{"esc"}</span>
-          <span style={{ fg: t.textMuted }}>{" decline"}</span>
-        </text>
-      </box>
+      {question.validation ? (
+        <box marginTop={1}>
+          <text>
+            <span style={{ fg: "#f87171" }}>{question.validation}</span>
+          </text>
+        </box>
+      ) : null}
+      {typingCustom ? (
+        <box flexDirection="row" gap={3} marginTop={1} flexShrink={0}>
+          <text>
+            <span style={{ fg: t.text }}>{"enter"}</span>
+            <span style={{ fg: t.textMuted }}>{" confirm"}</span>
+          </text>
+          <text>
+            <span style={{ fg: t.text }}>{"esc"}</span>
+            <span style={{ fg: t.textMuted }}>{" back"}</span>
+          </text>
+        </box>
+      ) : (
+        <box flexDirection="row" gap={3} marginTop={1} flexShrink={0}>
+          <text>
+            <span style={{ fg: t.text }}>{"↑↓"}</span>
+            <span style={{ fg: t.textMuted }}>{" select"}</span>
+          </text>
+          {question.multiple ? (
+            <text>
+              <span style={{ fg: t.text }}>{"space"}</span>
+              <span style={{ fg: t.textMuted }}>{" toggle"}</span>
+            </text>
+          ) : null}
+          <text>
+            <span style={{ fg: t.text }}>{"enter"}</span>
+            <span style={{ fg: t.textMuted }}>{" confirm"}</span>
+          </text>
+          <text>
+            <span style={{ fg: t.text }}>{"tab"}</span>
+            <span style={{ fg: t.textMuted }}>{" skip"}</span>
+          </text>
+          <text>
+            <span style={{ fg: t.text }}>{"esc"}</span>
+            <span style={{ fg: t.textMuted }}>{" decline"}</span>
+          </text>
+        </box>
+      )}
     </box>
   );
 }

@@ -57,7 +57,7 @@ function loadTreeSitter(): Promise<TreeSitterClient | null> {
   return sharedInit;
 }
 
-function buildSyntaxStyle(t: Theme): SyntaxStyle {
+export function buildSyntaxStyle(t: Theme): SyntaxStyle {
   return SyntaxStyle.fromStyles({
     default: { fg: RGBA.fromHex(t.text) },
     "markup.heading": { fg: RGBA.fromHex(t.mdHeading), bold: true },
@@ -108,9 +108,17 @@ const TABLE_OPTIONS = {
   borderColor: "#333333",
 };
 
-export function Markdown({ content, t, streaming }: { content: string; t: Theme; streaming?: boolean }) {
-  const syntaxStyle = useMemo(() => buildSyntaxStyle(t), [t]);
-  const normalizedContent = useMemo(() => normalizeCodeFenceLanguages(content), [content]);
+export function filetypeFromPath(filePath: string): string | undefined {
+  const base = filePath.split("/").pop() ?? filePath;
+  const dot = base.lastIndexOf(".");
+  if (dot <= 0) return undefined;
+  const ext = base.slice(dot + 1).toLowerCase();
+  if (ext === "txt") return undefined;
+  if (ext === "md" || ext === "markdown") return "markdown";
+  return CODE_LANG_ALIASES[ext] ?? ext;
+}
+
+export function useTreeSitterClient(): { client: TreeSitterClient | null; gen: number } {
   const [tsClient, setTsClient] = useState<TreeSitterClient | null>(() => sharedClient);
   const [parserGen, setParserGen] = useState(0);
   const preloadDoneAtMount = useRef(isExtraParsersPreloadSettled()).current;
@@ -130,6 +138,14 @@ export function Markdown({ content, t, streaming }: { content: string; t: Theme;
       live = false;
     };
   }, [tsClient, preloadDoneAtMount]);
+
+  return { client: tsClient, gen: parserGen };
+}
+
+export function Markdown({ content, t, streaming }: { content: string; t: Theme; streaming?: boolean }) {
+  const syntaxStyle = useMemo(() => buildSyntaxStyle(t), [t]);
+  const normalizedContent = useMemo(() => normalizeCodeFenceLanguages(content), [content]);
+  const { client: tsClient, gen: parserGen } = useTreeSitterClient();
 
   return (
     <markdown
