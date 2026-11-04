@@ -2045,6 +2045,32 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     [agent],
   );
 
+  const connectBuiltinProvider = useCallback(
+    (providerId: string, apiKey: string) => {
+      const provider = findProvider(providerId, customProviders);
+      if (!provider) return;
+      if (provider.models.length > 0) {
+        const selection = selectProvider(providerId);
+        if (selection) applyProviderSelection(providerId, apiKey, selection.modelId);
+        return;
+      }
+      fetchProviderModels(provider.baseUrl, apiKey)
+        .then((ids) => {
+          if (ids.length > 0) {
+            applyProviderSelection(providerId, apiKey, ids[0]);
+            return;
+          }
+          const selection = selectProvider(providerId);
+          if (selection) applyProviderSelection(providerId, apiKey, selection.modelId);
+        })
+        .catch(() => {
+          const selection = selectProvider(providerId);
+          if (selection) applyProviderSelection(providerId, apiKey, selection.modelId);
+        });
+    },
+    [applyProviderSelection, customProviders],
+  );
+
   const finishCustomProvider = useCallback(
     (modelIds: string[], defaultModelId: string, modelName?: string) => {
       const id = customDraft.id;
@@ -2084,18 +2110,15 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     setProviderSelectedId(provider.id);
     const savedKey = getProviderApiKey(provider.id);
     if (savedKey) {
-      const selection = selectProvider(provider.id);
-      if (selection) {
-        showProviderModalRef.current = false;
-        setShowProviderModal(false);
-        applyProviderSelection(provider.id, savedKey, selection.modelId);
-      }
+      showProviderModalRef.current = false;
+      setShowProviderModal(false);
+      connectBuiltinProvider(provider.id, savedKey);
       return;
     }
     setProviderStep("key");
     setProviderError(null);
     providerInputRef.current?.clear();
-  }, [applyProviderSelection, customProviders, providerIndex]);
+  }, [connectBuiltinProvider, customProviders, providerIndex]);
 
   const selectCustomModel = useCallback(() => {
     const modelId = customFetchedModels[providerIndex];
@@ -2190,8 +2213,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       showProviderModalRef.current = false;
       setShowProviderModal(false);
       setProviderError(null);
-      const selection = selectProvider(providerId);
-      if (selection) applyProviderSelection(providerId, input, selection.modelId);
+      connectBuiltinProvider(providerId, input);
       return;
     }
     if (providerStep === "customId") {
@@ -2262,7 +2284,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       finishCustomProvider([customDraft.modelId], customDraft.modelId, input || customDraft.modelId);
       return;
     }
-  }, [applyProviderSelection, customDraft, customProviders, finishCustomProvider, providerSelectedId, providerStep]);
+  }, [connectBuiltinProvider, customDraft, customProviders, finishCustomProvider, providerSelectedId, providerStep]);
 
   useEffect(() => {
     hasApiKeyRef.current = hasApiKey;

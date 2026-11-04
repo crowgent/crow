@@ -10820,15 +10820,7 @@ export const BUILTIN_PROVIDERS: ProviderDefinition[] = [
     id: "xai",
     name: "xAI",
     baseUrl: "https://api.x.ai/v1",
-    models: [
-      { id: "grok-4.7", name: "Grok 4.7", contextWindow: 500000, reasoning: true },
-      { id: "grok-4.6", name: "Grok 4.6", contextWindow: 500000, reasoning: true },
-      { id: "grok-4.5", name: "Grok 4.5", contextWindow: 500000, reasoning: true },
-      { id: "grok-4.3", name: "Grok 4.3", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.20-0309-reasoning", name: "Grok 4.20 (Reasoning)", contextWindow: 1000000, reasoning: true },
-      { id: "grok-4.20-0309-non-reasoning", name: "Grok 4.20 (Non-Reasoning)", contextWindow: 1000000 },
-      { id: "grok-build-0.1", name: "Grok Build 0.1", contextWindow: 256000, reasoning: true },
-    ],
+    models: [],
   },
 ];
 

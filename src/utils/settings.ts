@@ -381,7 +381,7 @@ export function getSelectedProvider(): SelectedProvider | null {
   const user = loadUserSettings();
   const savedModel = user.providerModels?.[providerId] || user.defaultModel;
   const modelId =
-    savedModel && provider.models.some((model) => model.id === savedModel)
+    savedModel && (provider.models.length === 0 || provider.models.some((model) => model.id === savedModel))
       ? savedModel
       : (provider.models[0]?.id ?? "");
   return { provider, apiKey, modelId };
@@ -390,7 +390,10 @@ export function getSelectedProvider(): SelectedProvider | null {
 export function selectProvider(providerId: string, modelId?: string): SelectedProvider | null {
   const provider = findProvider(providerId, loadCustomProviders());
   if (!provider) return null;
-  const model = modelId && provider.models.some((m) => m.id === modelId) ? modelId : (provider.models[0]?.id ?? "");
+  const model =
+    modelId && (provider.models.length === 0 || provider.models.some((m) => m.id === modelId))
+      ? modelId
+      : (provider.models[0]?.id ?? "");
   const currentModels = loadUserSettings().providerModels ?? {};
   saveUserSettings({
     providerId,

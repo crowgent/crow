@@ -12,7 +12,7 @@ import {
 } from "../../src/utils/providers";
 
 describe("providers", () => {
-  it("lists built-in providers including the xai grok provider", () => {
+  it("lists built-in providers including xai with live-resolved models", () => {
     const ids = BUILTIN_PROVIDERS.map((provider) => provider.id);
     expect(ids).toContain("openai");
     expect(ids).toContain("deepseek");
@@ -41,15 +41,7 @@ describe("providers", () => {
     expect(ids).not.toContain("xiaomi");
     const xai = BUILTIN_PROVIDERS.find((provider) => provider.id === "xai");
     expect(xai?.baseUrl).toBe("https://api.x.ai/v1");
-    expect(xai?.models.map((model) => model.id)).toEqual([
-      "grok-4.7",
-      "grok-4.6",
-      "grok-4.5",
-      "grok-4.3",
-      "grok-4.20-0309-reasoning",
-      "grok-4.20-0309-non-reasoning",
-      "grok-build-0.1",
-    ]);
+    expect(xai?.models).toEqual([]);
     expect(PROVIDER_API_KEY_ENVS.find((entry) => entry.providerId === "xai")?.envVars).toEqual(["XAI_API_KEY"]);
   });
 
