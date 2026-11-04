@@ -40,6 +40,12 @@ OpenAI-compatible provider, or add your own, and code without the bloat.
 curl -fsSL https://raw.githubusercontent.com/crowgent/crow/main/install.sh | bash
 ```
 
+Or with npm:
+
+```sh
+npm install -g @crowgentai/crow
+```
+
 On Windows (PowerShell):
 
 ```powershell
