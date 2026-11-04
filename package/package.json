@@ -1,0 +1,30 @@
+{
+  "bin": {
+    "crow": "./bin/crow.cjs"
+  },
+  "description": "Crow is a lightweight, minimal AI coding agent for the terminal. Connect any OpenAI-compatible provider, or add your own, and code without the bloat.",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "bin"
+  ],
+  "homepage": "https://github.com/crowgent/crow",
+  "license": "MIT",
+  "name": "@crowgentai/crow",
+  "optionalDependencies": {
+    "@crowgentai/crow-darwin-arm64": "1.1.42",
+    "@crowgentai/crow-linux-x64": "1.1.42",
+    "@crowgentai/crow-windows-x64": "1.1.42"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "directory": "package",
+    "type": "git",
+    "url": "https://github.com/crowgent/crow.git"
+  },
+  "type": "commonjs",
+  "version": "1.1.42"
+}

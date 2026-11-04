@@ -1,0 +1,23 @@
+{
+  "cpu": [
+    "x64"
+  ],
+  "description": "Crow CLI binary for Windows x64.",
+  "files": [
+    "bin"
+  ],
+  "license": "MIT",
+  "name": "@crowgentai/crow-windows-x64",
+  "os": [
+    "win32"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "directory": "package/crow-windows-x64",
+    "type": "git",
+    "url": "https://github.com/crowgent/crow.git"
+  },
+  "version": "1.1.42"
+}

@@ -1,0 +1,73 @@
+export const dark = {
+  background: "#0a0a0a",
+  backgroundPanel: "#141414",
+  backgroundElement: "#1e1e1e",
+  border: "#333333",
+  borderActive: "#555555",
+  text: "#e0e0e0",
+  textMuted: "#666666",
+  textDim: "#444444",
+  primary: "#ffffff",
+  accent: "#5c9cf5",
+  effort: "#f5a742",
+  subagentAccent: "#66d9c2",
+  selected: "#ffffff",
+  selectedBg: "#2a2a2a",
+  diffAdded: "#1e3a1e",
+  diffAddedFg: "#8adf8a",
+  diffAddedLineNum: "#3a6a3a",
+  diffRemoved: "#3a1e1e",
+  diffRemovedFg: "#df8a8a",
+  diffRemovedLineNum: "#6a3a3a",
+  diffContext: "#161616",
+  diffContextFg: "#999999",
+  diffLineNumber: "#555555",
+  diffHeader: "#1c1c1c",
+  diffHeaderFg: "#888888",
+  diffSeparator: "#1a1a1a",
+  diffSeparatorFg: "#555555",
+  mdHeading: "#61afef",
+  mdBold: "#e8a465",
+  mdItalic: "#e5c07b",
+  mdCode: "#6abf6a",
+  mdCodeBlockBg: "#141414",
+  mdCodeBlockFg: "#c0c0c0",
+  codeKeyword: "#c678dd",
+  codeString: "#98c379",
+  codeComment: "#7f848e",
+  codeNumber: "#d19a66",
+  codeFunction: "#61afef",
+  codeType: "#e5c07b",
+  codeOperator: "#56b6c2",
+  codeProperty: "#e06c75",
+  codePunctuation: "#888888",
+  mdLink: "#5c9cf5",
+  mdLinkText: "#d4a0d4",
+  mdHr: "#333333",
+  mdListBullet: "#666666",
+  planBorder: "#e5c07b",
+  planTitle: "#e5c07b",
+  planStepNum: "#e5c07b",
+  planStepTitle: "#e0e0e0",
+  planStepDesc: "#999999",
+  planStepFile: "#5c9cf5",
+  planQuestionText: "#e0e0e0",
+  planOptionDefault: "#888888",
+  planOptionSelected: "#e5c07b",
+  planOptionCheck: "#22c55e",
+  planInputBg: "#1a1a1a",
+  planInputText: "#e0e0e0",
+  planHint: "#555555",
+  queueBg: "#222222",
+} as const;
+
+export function mixHex(a: string, b: string): string {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  const mix = (x: number, y: number) =>
+    Math.round((x + y) / 2)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${mix(channel(a, 1), channel(b, 1))}${mix(channel(a, 3), channel(b, 3))}${mix(channel(a, 5), channel(b, 5))}`;
+}
+
+export type Theme = typeof dark;
