@@ -67,7 +67,15 @@ Use this exact format:
 - [Important details needed to continue]
 - [(none) if not applicable]
 
-Keep it concise, but preserve exact file paths, function names, and error messages.`;
+## Relevant Files
+- [Exact file path, max 15 files]
+- [(none) if none were mentioned]
+
+## Open Questions
+- [Unanswered user questions, in the user's exact wording]
+- [(none) if none are open]
+
+Keep each bullet to a single line. Keep it concise, but preserve exact file paths, function names, and error messages.`;
 
 const UPDATE_SUMMARIZATION_PROMPT = `The messages above are new conversation messages to incorporate into the existing summary provided below.
 
@@ -76,6 +84,8 @@ Update the existing structured summary with new information. Rules:
 - Add new progress, decisions, and critical context
 - Move completed items from "In Progress" to "Done" when appropriate
 - Update "Next Steps" based on the current state
+- Add newly relevant files, keeping the list to at most 15 exact paths
+- Carry forward unanswered user questions in the user's exact wording
 - Preserve exact file paths, function names, and error messages
 
 Use the exact same section structure as the existing summary format.`;
@@ -415,20 +425,32 @@ async function summarizeConversation(
   }
 
   const runtime = resolveModelRuntime(provider, modelId);
-  const { text } = await generateText({
-    model: runtime.model,
-    system: SUMMARIZATION_SYSTEM_PROMPT,
-    prompt: promptParts.filter(Boolean).join("\n\n"),
-    abortSignal: signal,
-    maxRetries: 0,
-    temperature: 0.2,
-    ...(runtime.modelInfo?.supportsMaxOutputTokens === false
-      ? {}
-      : { maxOutputTokens: Math.max(512, Math.floor(reserveTokens * 0.8)) }),
-    ...(runtime.providerOptions ? { providerOptions: runtime.providerOptions } : {}),
-  });
+  const promptText = promptParts.filter(Boolean).join("\n\n");
+  const expectedHeaders =
+    promptOverride === TURN_PREFIX_SUMMARIZATION_PROMPT
+      ? ["## Original Request", "## Early Progress", "## Context For Suffix"]
+      : ["## Goal", "## Progress", "## Next Steps"];
+  const runSummary = async (prompt: string): Promise<string> => {
+    const { text } = await generateText({
+      model: runtime.model,
+      system: SUMMARIZATION_SYSTEM_PROMPT,
+      prompt,
+      abortSignal: signal,
+      maxRetries: 0,
+      temperature: 0.2,
+      ...(runtime.modelInfo?.supportsMaxOutputTokens === false
+        ? {}
+        : { maxOutputTokens: Math.max(512, Math.floor(reserveTokens * 0.8)) }),
+      ...(runtime.providerOptions ? { providerOptions: runtime.providerOptions } : {}),
+    });
+    return text.trim();
+  };
 
-  return text.trim();
+  const first = await runSummary(promptText);
+  if (expectedHeaders.every((header) => first.includes(header))) return first;
+  return runSummary(
+    `${promptText}\n\nYour previous reply skipped the required section structure. Reply again using exactly that section structure and nothing else.`,
+  );
 }
 
 export async function generateCompactionSummary(

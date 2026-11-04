@@ -326,7 +326,7 @@ export function createTools(
 
     read_file: tool({
       description:
-        "Read the contents of a file. Returns numbered lines with a header showing the range and total line count. Use start_line/end_line to read specific sections of large files iteratively.",
+        "Read the contents of a file. Call this tool to inspect a file instead of asking the user for its contents or guessing what is in it. Returns numbered lines with a header showing the range and total line count. Use start_line/end_line to read specific sections of large files iteratively.",
       inputSchema: z.object({
         path: z.string().describe("File path (relative to cwd or absolute)"),
         start_line: z.number().optional().describe("First line to read (1-indexed, default: 1)"),
@@ -339,7 +339,7 @@ export function createTools(
 
     grep: tool({
       description:
-        'Fast content search tool that works with any codebase size. Searches file contents using regular expressions. Supports full regex syntax (e.g. "log.*Error", "function\\s+\\w+"). Filter files by pattern with the include parameter (e.g. "*.js", "*.{ts,tsx}"). Returns matching file paths and line numbers sorted by modification time. Use this tool when you need to find files containing specific patterns. If you need to count matches within files, use bash with `rg` directly.',
+        'Fast content search tool that works with any codebase size. Call this tool instead of shell search commands when you need to find files containing specific patterns. Searches file contents using regular expressions. Supports full regex syntax (e.g. "log.*Error", "function\\s+\\w+"). Filter files by pattern with the include parameter (e.g. "*.js", "*.{ts,tsx}"). Returns matching file paths and line numbers sorted by modification time. If you need to count matches within files, use bash with `rg` directly.',
       inputSchema: z.object({
         pattern: z.string().describe("The regex pattern to search for in file contents"),
         path: z
@@ -366,7 +366,7 @@ export function createTools(
 
     todo: tool({
       description:
-        "Manage the session todo list. Use for tracking multi-step work: add items, list them, mark done, remove them.",
+        "Manage the session todo list. Use for tracking multi-step work: add items, list them, mark done, remove them. Keep it updated as work progresses and mark an item done only once its outcome is established, never when it is merely started.",
       inputSchema: z.object({
         operation: z.enum(["add", "list", "done", "remove"]),
         text: z.string().optional().describe("Todo text, required for add"),
@@ -872,7 +872,7 @@ export function createTools(
 
     tools.write_file = tool({
       description:
-        "Create or overwrite a file with the given content. Use for creating new files or completely rewriting existing ones. Returns a diff of the changes.",
+        "Create or overwrite a file with the given content. Call this tool to create a file instead of writing its contents out as text for the user to save. Use for creating new files or completely rewriting existing ones. Returns a diff of the changes.",
       inputSchema: z.object({
         path: z.string().describe("File path (relative to cwd or absolute)"),
         content: z.string().describe("The full file content to write"),
@@ -884,7 +884,7 @@ export function createTools(
 
     tools.edit_file = tool({
       description:
-        "Edit a file by replacing a unique string with new content. The old_string must appear exactly once in the file. Include enough surrounding context lines in old_string to make it unique. Returns a diff of the changes.",
+        "Edit a file by replacing a unique string with new content. Call this tool to change a file instead of describing the change or showing the full new file as text. The old_string must appear exactly once in the file. Include enough surrounding context lines in old_string to make it unique. Returns a diff of the changes.",
       inputSchema: z.object({
         path: z.string().describe("File path (relative to cwd or absolute)"),
         old_string: z.string().describe("The exact text to find (must be unique in the file)"),

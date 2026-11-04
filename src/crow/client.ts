@@ -145,7 +145,12 @@ export async function generateTitle(
       prompt: userMessage,
     });
     return {
-      title: text?.trim().replace(/^["']|["']$/g, "") || "New session",
+      title:
+        text
+          ?.trim()
+          .split("\n")[0]
+          ?.trim()
+          .replace(/^["']|["']$/g, "") || "New session",
       modelId: runtime.modelId,
       usage,
     };
