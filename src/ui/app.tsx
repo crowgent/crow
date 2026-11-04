@@ -53,6 +53,7 @@ import { FileIndex } from "../utils/file-index.js";
 import { copyTextToHostClipboard } from "../utils/host-clipboard";
 import { getScriptInstallContext } from "../utils/install-manager";
 import {
+  BUILTIN_PROVIDERS,
   type CustomProvider,
   fetchProviderModels,
   findProvider,
@@ -68,6 +69,7 @@ import {
   getSelectedProvider,
   getTelegramBotToken,
   isReservedSubagentName,
+  listStoredProviderIds,
   loadCustomProviders,
   loadMcpServers,
   loadUserSettings,
@@ -571,6 +573,12 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     selectedSet: number[];
     customText: string | null;
     validation: string | null;
+  } | null>(null);
+  const [envPanel, setEnvPanel] = useState<{
+    rows: Array<{ id: string; name: string; hasKey: boolean }>;
+    index: number;
+    editing: string | null;
+    draft: string;
   } | null>(null);
   const questionQueueRef = useRef<
     Array<{
@@ -2048,6 +2056,22 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     setShowProviderModal(true);
   }, []);
 
+  const openEnvPanel = useCallback(() => {
+    const stored = new Set(listStoredProviderIds());
+    const byId = new Map<string, { id: string; name: string; hasKey: boolean }>();
+    for (const provider of BUILTIN_PROVIDERS) {
+      byId.set(provider.id, { id: provider.id, name: provider.name, hasKey: stored.has(provider.id) });
+    }
+    for (const custom of loadCustomProviders()) {
+      byId.set(custom.id, { id: custom.id, name: custom.name, hasKey: stored.has(custom.id) });
+    }
+    for (const id of stored) {
+      if (!byId.has(id)) byId.set(id, { id, name: id, hasKey: true });
+    }
+    setEnvPanel({ rows: [...byId.values()], index: 0, editing: null, draft: "" });
+    setTimeout(scrollToBottom, 10);
+  }, [scrollToBottom]);
+
   const applyProviderSelection = useCallback(
     (providerId: string, apiKey: string, modelId: string) => {
       const selection = selectProvider(providerId, modelId);
@@ -3046,6 +3070,9 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
         case "connect":
           openProviderConnect();
           break;
+        case "env":
+          openEnvPanel();
+          break;
         case "models":
           openProviderModels();
           break;
@@ -3121,6 +3148,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       openSessionModal,
       openMcpModal,
       openProviderConnect,
+      openEnvPanel,
       openProviderModels,
       openRecapPicker,
       openSandboxPicker,
@@ -3142,6 +3170,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     !!pendingPaymentApproval ||
     !!pendingPermission ||
     !!pendingQuestion ||
+    !!envPanel ||
     showScheduleModal ||
     showAgentsModal ||
     showAgentsEditor ||
@@ -3821,6 +3850,62 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
         }
         return;
       }
+      if (envPanel) {
+        if (envPanel.editing) {
+          if (isEscapeKey(key)) {
+            setEnvPanel((p) => (p ? { ...p, editing: null, draft: "" } : p));
+            return;
+          }
+          if (key.name === "return") {
+            const id = envPanel.editing;
+            const draft = envPanel.draft;
+            if (draft) {
+              saveProviderApiKey(id, draft);
+              setEnvPanel((p) =>
+                p
+                  ? {
+                      ...p,
+                      editing: null,
+                      draft: "",
+                      rows: p.rows.map((r) => (r.id === id ? { ...r, hasKey: true } : r)),
+                    }
+                  : p,
+              );
+            } else {
+              setEnvPanel((p) => (p ? { ...p, editing: null, draft: "" } : p));
+            }
+            return;
+          }
+          if (key.name === "backspace") {
+            setEnvPanel((p) => (p ? { ...p, draft: p.draft.slice(0, -1) } : p));
+            return;
+          }
+          if (key.sequence && key.sequence.length === 1) {
+            setEnvPanel((p) => (p ? { ...p, draft: p.draft + key.sequence } : p));
+            return;
+          }
+          return;
+        }
+        if (isEscapeKey(key)) {
+          setEnvPanel(null);
+          return;
+        }
+        if (key.name === "up" || key.name === "down") {
+          setEnvPanel((p) =>
+            p ? { ...p, index: wrapListIndex(p.index, p.rows.length, key.name === "down" ? 1 : -1) } : p,
+          );
+          return;
+        }
+        if (key.name === "return") {
+          const row = envPanel.rows[envPanel.index];
+          if (row) {
+            setEnvPanel((p) => (p ? { ...p, editing: row.id, draft: "" } : p));
+          }
+          return;
+        }
+        return;
+      }
+
       if (pendingQuestion) {
         if (pendingQuestion.customText !== null) {
           if (isEscapeKey(key)) {
@@ -4232,6 +4317,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       pendingPaymentApproval,
       pendingPermission,
       pendingQuestion,
+      envPanel,
       answerPermission,
       answerQuestion,
       declineQuestion,
@@ -4404,6 +4490,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
               {pendingPaymentApproval && <PaymentApprovalPanel t={t} payment={pendingPaymentApproval} />}
               {pendingPermission && <PermissionApprovalPanel t={t} permission={pendingPermission} />}
               {pendingQuestion && <QuestionPanel t={t} question={pendingQuestion} />}
+              {envPanel && <EnvPanel t={t} panel={envPanel} />}
             </scrollbox>
             {btwState && <BtwOverlay state={btwState} theme={t} />}
             {/* Prompt */}
@@ -4482,7 +4569,8 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
               <HeroLogo t={t} />
             </box>
             <box height={1} minHeight={0} flexShrink={1} />
-            <box width="100%" maxWidth={75} flexShrink={0}>
+            <box width="100%" maxWidth={75} flexShrink={0} flexDirection="column">
+              {envPanel && <EnvPanel t={t} panel={envPanel} />}
               <PromptBox
                 t={t}
                 inputRef={inputRef}
@@ -6892,6 +6980,53 @@ function PaymentApprovalPanel({
           <span style={{ fg: t.textMuted }}>{" reject"}</span>
         </text>
       </box>
+    </box>
+  );
+}
+
+function EnvPanel({
+  t,
+  panel,
+}: {
+  t: Theme;
+  panel: {
+    rows: Array<{ id: string; name: string; hasKey: boolean }>;
+    index: number;
+    editing: string | null;
+    draft: string;
+  };
+}) {
+  const listRef = useRef<ScrollBoxRenderable>(null);
+  useEffect(() => {
+    const row = panel.rows[panel.index];
+    if (row) listRef.current?.scrollChildIntoView(`env-${row.id}`);
+  }, [panel.index, panel.rows]);
+  const visible = Math.min(panel.rows.length, 20);
+  return (
+    <box paddingLeft={3} paddingRight={2} marginTop={1} flexShrink={0} flexDirection="column">
+      <text>
+        <b>Provider keys</b>
+      </text>
+      <box marginTop={1} height={visible}>
+        <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
+          {panel.rows.map((row, i) => {
+            const isCursor = i === panel.index;
+            const editing = panel.editing === row.id;
+            return (
+              <box key={row.id} id={`env-${row.id}`} flexDirection="column">
+                <text>
+                  <span style={{ fg: isCursor ? "#22c55e" : t.textMuted }}>{isCursor ? "> " : "  "}</span>
+                  <span style={{ fg: isCursor ? t.text : t.textMuted }}>{isCursor ? <b>{row.name}</b> : row.name}</span>
+                  <span style={{ fg: t.textMuted }}>
+                    {editing ? `  ${"•".repeat(panel.draft.length)}█` : row.hasKey ? "  ••••••••" : "  not set"}
+                  </span>
+                </text>
+              </box>
+            );
+          })}
+        </scrollbox>
+      </box>
+      <text fg={t.textDim}>{panel.editing ? "enter save · esc cancel" : "↑↓ select · enter edit · esc close"}</text>
     </box>
   );
 }

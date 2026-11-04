@@ -365,6 +365,11 @@ export function saveProviderApiKey(providerId: string, apiKey: string): void {
   writeJson(AUTH_PATH, auth);
 }
 
+export function listStoredProviderIds(): string[] {
+  migrateLegacyProviderKeys();
+  return Object.keys(loadAuthFile());
+}
+
 export interface SelectedProvider {
   provider: ProviderDefinition;
   apiKey: string;

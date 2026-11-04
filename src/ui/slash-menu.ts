@@ -14,6 +14,7 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "mcp", label: "mcp", description: "Manage MCP servers" },
   { id: "sandbox", label: "sandbox", description: "Select shell sandbox mode" },
   { id: "connect", label: "connect", description: "Choose a provider and enter its API key", aliases: ["login"] },
+  { id: "env", label: "env", description: "View and update stored provider keys" },
   {
     id: "models",
     label: "models",
