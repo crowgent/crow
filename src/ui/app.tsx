@@ -3138,11 +3138,25 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
             setUpdateOutput(result.success ? result.output : `Update failed: ${result.output}`);
           });
           break;
+        case "clear":
+          handleCommand("/clear");
+          break;
+        case "fork":
+          handleCommand("/fork");
+          break;
+        case "transfer":
+          inputRef.current?.clear();
+          inputRef.current?.insertText("/transfer ");
+          break;
+        case "budget":
+          handleCommand("/budget");
+          break;
       }
     },
     [
       agent,
       disconnectTelegramBridge,
+      handleCommand,
       handleExit,
       openAgentsModal,
       openSessionModal,
@@ -4504,6 +4518,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
                 showSlashMenu={showSlashMenu}
                 slashItems={filteredSlashItems}
                 slashMenuIndex={slashMenuIndex}
+                slashQuery={slashSearchQuery}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
                 showAgentsModal={showAgentsModal}
@@ -4580,6 +4595,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
                 showSlashMenu={showSlashMenu}
                 slashItems={filteredSlashItems}
                 slashMenuIndex={slashMenuIndex}
+                slashQuery={slashSearchQuery}
                 showPlanQuestions={showPlanPanel}
                 showProviderModal={showProviderModal}
                 showAgentsModal={showAgentsModal}
@@ -4961,6 +4977,7 @@ function PromptBox({
   showSlashMenu,
   slashItems,
   slashMenuIndex,
+  slashQuery,
   showPlanQuestions,
   showProviderModal,
   showAgentsModal,
@@ -4988,6 +5005,7 @@ function PromptBox({
   showSlashMenu: boolean;
   slashItems: SlashMenuItem[];
   slashMenuIndex: number;
+  slashQuery: string;
   showPlanQuestions: boolean;
   showProviderModal: boolean;
   showAgentsModal: boolean;
@@ -5045,7 +5063,9 @@ function PromptBox({
         {showSuggestions && typeahead && (
           <SuggestionOverlay t={t} suggestions={typeahead.suggestions} selectedIndex={typeahead.selectedIndex} />
         )}
-        {showSlashMenu && <SlashMenuPanel t={t} selectedIndex={slashMenuIndex} filteredItems={slashItems} />}
+        {showSlashMenu && (
+          <SlashMenuPanel t={t} selectedIndex={slashMenuIndex} filteredItems={slashItems} query={slashQuery} />
+        )}
         <box
           border={["left"]}
           customBorderChars={SPLIT}
@@ -6333,10 +6353,12 @@ function SlashMenuPanel({
   t,
   selectedIndex,
   filteredItems,
+  query,
 }: {
   t: Theme;
   selectedIndex: number;
   filteredItems: SlashMenuItem[];
+  query: string;
 }) {
   const listRef = useRef<ScrollBoxRenderable>(null);
   useEffect(() => {
@@ -6345,7 +6367,14 @@ function SlashMenuPanel({
   }, [selectedIndex, filteredItems]);
   const visible = filteredItems.length === 0 ? 1 : Math.min(filteredItems.length, 10);
   return (
-    <box backgroundColor={t.backgroundPanel} flexDirection="column" flexShrink={0} height={visible}>
+    <box backgroundColor={t.backgroundPanel} flexDirection="column" flexShrink={0} height={visible + 1}>
+      <box flexShrink={0} paddingLeft={2} paddingRight={2}>
+        <text fg={t.text}>
+          {"/"}
+          {query}
+          <span style={{ fg: t.primary }}>{"█"}</span>
+        </text>
+      </box>
       <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
         {filteredItems.map((item, idx) => (
           <box

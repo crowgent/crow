@@ -6,7 +6,7 @@ export interface SlashMenuItem {
 }
 
 export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
-  { id: "exit", label: "exit", description: "Quit the CLI" },
+  { id: "exit", label: "exit", description: "Quit the CLI", aliases: ["quit", "q"] },
   { id: "remote-control", label: "remote-control", description: "Remote control" },
   { id: "disconnect", label: "disconnect", description: "Disconnect Telegram bridge" },
   { id: "agents", label: "agents", description: "Manage custom sub-agents" },
@@ -31,6 +31,10 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
   { id: "skills", label: "skills", description: "Manage skills" },
   { id: "btw", label: "btw", description: "Ask a side question without interrupting" },
   { id: "update", label: "update", description: "Update crow to the latest version" },
+  { id: "clear", label: "clear", description: "Clear the conversation" },
+  { id: "fork", label: "fork", description: "Fork the current session" },
+  { id: "transfer", label: "transfer", description: "Move the session to another directory" },
+  { id: "budget", label: "budget", description: "Set the session token budget" },
 ];
 
 export function filterSlashMenuItems(items: SlashMenuItem[], query: string): SlashMenuItem[] {
