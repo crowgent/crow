@@ -13,6 +13,7 @@ function toModelInfo(providerId: string, model: ProviderModel): ProviderModelInf
     inputPrice: 0,
     outputPrice: 0,
     reasoning: model.reasoning ?? false,
+    supportsReasoningEffort: model.reasoning ?? false,
     description: model.description ?? "",
     provider: providerId,
   };
@@ -45,13 +46,20 @@ export function getModelsForProvider(providerId: string): ProviderModelInfo[] {
   return MODELS.filter((model) => model.provider === providerId);
 }
 
-export function getSupportedReasoningEfforts(_modelId: string): ReasoningEffort[] {
-  return [];
+const BASE_REASONING_EFFORTS: ReasoningEffort[] = ["low", "medium", "high"];
+const EXTENDED_REASONING_EFFORTS: ReasoningEffort[] = ["low", "medium", "high", "xhigh"];
+
+export function getSupportedReasoningEfforts(modelId: string): ReasoningEffort[] {
+  const info = getModelInfo(modelId);
+  if (!info?.supportsReasoningEffort) return [];
+  return info.provider === "openai" || info.provider === "anthropic"
+    ? EXTENDED_REASONING_EFFORTS
+    : BASE_REASONING_EFFORTS;
 }
 
-export function getEffectiveReasoningEffort(
-  _modelId: string,
-  _override?: ReasoningEffort,
-): ReasoningEffort | undefined {
-  return undefined;
+export function getEffectiveReasoningEffort(modelId: string, override?: ReasoningEffort): ReasoningEffort | undefined {
+  const supported = getSupportedReasoningEfforts(modelId);
+  const candidate = override ?? getModelInfo(modelId)?.defaultReasoningEffort;
+  if (!candidate || !supported.includes(candidate)) return undefined;
+  return candidate;
 }

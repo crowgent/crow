@@ -21,6 +21,12 @@ export const SLASH_MENU_ITEMS: SlashMenuItem[] = [
     description: "Select a model for the selected provider",
     aliases: ["model", "mode"],
   },
+  {
+    id: "effort",
+    label: "effort",
+    description: "Set the thinking effort for the current model",
+    aliases: ["thinking"],
+  },
   { id: "recaps", label: "recaps", description: "Turn session recaps on/off", aliases: ["recap", "summary"] },
   { id: "new", label: "new session", description: "Start a new session" },
   { id: "session", label: "session", description: "Switch to an old session" },
@@ -62,12 +68,14 @@ function normalizeSlashSearchQuery(query: string): string {
 }
 
 function scoreSlashMenuItem(item: SlashMenuItem, query: string): number {
-  const commandFields = [item.id, item.label, ...(item.aliases ?? [])].flatMap(tokenizeSearchText);
+  const nameFields = [item.id, item.label].flatMap(tokenizeSearchText);
+  const aliasFields = (item.aliases ?? []).flatMap(tokenizeSearchText);
   const descriptionFields = tokenizeSearchText(item.description);
 
-  const commandScore = scoreFields(commandFields, query, 0);
+  const nameScore = scoreFields(nameFields, query, 0);
+  const aliasScore = scoreFields(aliasFields, query, 1);
   const descriptionScore = scoreFields(descriptionFields, query, 3);
-  return Math.min(commandScore, descriptionScore);
+  return Math.min(nameScore, aliasScore, descriptionScore);
 }
 
 function scoreFields(fields: string[], query: string, offset: number): number {

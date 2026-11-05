@@ -15,6 +15,7 @@ import {
 import type { resolveModelRuntime } from "../crow/client";
 import { toolSetToBatchTools } from "../crow/tool-schemas";
 import type { Plan, TaskRequest, ToolCall, ToolResult, UsageSource } from "../types/index";
+import { getReasoningEffortForModel } from "../utils/settings";
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
@@ -157,7 +158,7 @@ export async function runTaskRequestBatch(
               temperature: request.agent === "explore" ? 0.2 : 0.5,
               maxOutputTokens:
                 childRuntime.modelInfo?.supportsMaxOutputTokens === false ? undefined : Math.min(ctx.maxTokens, 8_192),
-              reasoningEffort: undefined,
+              reasoningEffort: getReasoningEffortForModel(childRuntime.modelId),
               tools: batchTools,
             }),
           },

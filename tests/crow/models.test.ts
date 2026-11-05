@@ -30,13 +30,17 @@ describe("models", () => {
     expect(getModelsForProvider("deepseek").map((model) => model.id)).toEqual(["deepseek-chat", "deepseek-reasoner"]);
   });
 
-  it("reports no supported reasoning-effort levels", () => {
-    expect(getSupportedReasoningEfforts("gpt-5")).toEqual([]);
-    expect(getSupportedReasoningEfforts("deepseek-reasoner")).toEqual([]);
+  it("reports the supported reasoning-effort levels per model", () => {
+    expect(getSupportedReasoningEfforts("gpt-5")).toEqual(["low", "medium", "high", "xhigh"]);
+    expect(getSupportedReasoningEfforts("deepseek-reasoner")).toEqual(["low", "medium", "high"]);
+    expect(getSupportedReasoningEfforts("gpt-4o")).toEqual([]);
+    expect(getSupportedReasoningEfforts("unknown-model")).toEqual([]);
   });
 
-  it("resolves no effective reasoning effort", () => {
+  it("resolves the effective reasoning effort", () => {
     expect(getEffectiveReasoningEffort("gpt-5")).toBeUndefined();
-    expect(getEffectiveReasoningEffort("gpt-5", "high")).toBeUndefined();
+    expect(getEffectiveReasoningEffort("gpt-5", "high")).toBe("high");
+    expect(getEffectiveReasoningEffort("gpt-4o", "high")).toBeUndefined();
+    expect(getEffectiveReasoningEffort("deepseek-reasoner", "xhigh")).toBeUndefined();
   });
 });

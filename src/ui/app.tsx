@@ -580,6 +580,11 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     editing: string | null;
     draft: string;
   } | null>(null);
+  const [effortPanel, setEffortPanel] = useState<{
+    modelId: string;
+    rows: Array<{ id: "default" | ReasoningEffort; label: string }>;
+    index: number;
+  } | null>(null);
   const questionQueueRef = useRef<
     Array<{
       questions: Array<{
@@ -2072,6 +2077,26 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     setTimeout(scrollToBottom, 10);
   }, [scrollToBottom]);
 
+  const openEffortPanel = useCallback(
+    (modelId?: string) => {
+      const target = normalizeModelId(modelId ?? model);
+      const supported = getSupportedReasoningEfforts(target);
+      if (supported.length === 0) {
+        setMessages((prev) => [...prev, buildAssistantEntry("This model does not support thinking effort.")]);
+        return;
+      }
+      const current = getModelReasoningEffort(target);
+      const rows = [
+        { id: "default" as const, label: "Default" },
+        ...supported.map((effort) => ({ id: effort, label: effort })),
+      ];
+      const index = current ? rows.findIndex((row) => row.id === current) : 0;
+      setEffortPanel({ modelId: target, rows, index: index < 0 ? 0 : index });
+      setTimeout(scrollToBottom, 10);
+    },
+    [model, getModelReasoningEffort, scrollToBottom],
+  );
+
   const applyProviderSelection = useCallback(
     (providerId: string, apiKey: string, modelId: string) => {
       const selection = selectProvider(providerId, modelId);
@@ -2805,6 +2830,10 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
         openProviderModels();
         return true;
       }
+      if (c === "/effort" || c === "/thinking") {
+        openEffortPanel();
+        return true;
+      }
       if (c === "/sandbox") {
         openSandboxPicker();
         return true;
@@ -3045,6 +3074,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       disconnectTelegramBridge,
       handleExit,
       openAgentsModal,
+      openEffortPanel,
       openSessionModal,
       switchToSession,
       openMcpModal,
@@ -3148,6 +3178,9 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
           inputRef.current?.clear();
           inputRef.current?.insertText("/transfer ");
           break;
+        case "effort":
+          openEffortPanel();
+          break;
         case "budget":
           handleCommand("/budget");
           break;
@@ -3159,6 +3192,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       handleCommand,
       handleExit,
       openAgentsModal,
+      openEffortPanel,
       openSessionModal,
       openMcpModal,
       openProviderConnect,
@@ -3185,6 +3219,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
     !!pendingPermission ||
     !!pendingQuestion ||
     !!envPanel ||
+    !!effortPanel ||
     showScheduleModal ||
     showAgentsModal ||
     showAgentsEditor ||
@@ -3850,6 +3885,10 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
           }
           setShowModelPicker(false);
           setModelSearchQuery("");
+          const savedEffort = reasoningEffortByModel[normalizeModelId(sel)];
+          if (savedEffort && !getEffectiveReasoningEffort(sel, savedEffort)) {
+            openEffortPanel(sel);
+          }
           return;
         }
         if (key.name === "backspace") {
@@ -3915,6 +3954,32 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
           if (row) {
             setEnvPanel((p) => (p ? { ...p, editing: row.id, draft: "" } : p));
           }
+          return;
+        }
+        return;
+      }
+      if (effortPanel) {
+        if (isEscapeKey(key)) {
+          setEffortPanel(null);
+          return;
+        }
+        if (key.name === "up" || key.name === "down") {
+          setEffortPanel((p) =>
+            p ? { ...p, index: wrapListIndex(p.index, p.rows.length, key.name === "down" ? 1 : -1) } : p,
+          );
+          return;
+        }
+        if (key.name === "return") {
+          const row = effortPanel.rows[effortPanel.index];
+          if (row) {
+            if (row.id === "default") {
+              const { [effortPanel.modelId]: _, ...rest } = reasoningEffortByModel;
+              setReasoningEfforts(rest);
+            } else {
+              setReasoningEfforts({ ...reasoningEffortByModel, [effortPanel.modelId]: row.id });
+            }
+          }
+          setEffortPanel(null);
           return;
         }
         return;
@@ -4332,6 +4397,10 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
       pendingPermission,
       pendingQuestion,
       envPanel,
+      effortPanel,
+      openEffortPanel,
+      reasoningEffortByModel,
+      setReasoningEfforts,
       answerPermission,
       answerQuestion,
       declineQuestion,
@@ -4505,6 +4574,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
               {pendingPermission && <PermissionApprovalPanel t={t} permission={pendingPermission} />}
               {pendingQuestion && <QuestionPanel t={t} question={pendingQuestion} />}
               {envPanel && <EnvPanel t={t} panel={envPanel} />}
+              {effortPanel && <EffortPanel t={t} panel={effortPanel} />}
             </scrollbox>
             {btwState && <BtwOverlay state={btwState} theme={t} />}
             {/* Prompt */}
@@ -4586,6 +4656,7 @@ export function App({ agent, startupConfig, initialMessage, onExit, onRestart }:
             <box height={1} minHeight={0} flexShrink={1} />
             <box width="100%" maxWidth={75} flexShrink={0} flexDirection="column">
               {envPanel && <EnvPanel t={t} panel={envPanel} />}
+              {effortPanel && <EffortPanel t={t} panel={effortPanel} />}
               <PromptBox
                 t={t}
                 inputRef={inputRef}
@@ -7009,6 +7080,50 @@ function PaymentApprovalPanel({
           <span style={{ fg: t.textMuted }}>{" reject"}</span>
         </text>
       </box>
+    </box>
+  );
+}
+
+function EffortPanel({
+  t,
+  panel,
+}: {
+  t: Theme;
+  panel: {
+    modelId: string;
+    rows: Array<{ id: "default" | ReasoningEffort; label: string }>;
+    index: number;
+  };
+}) {
+  const listRef = useRef<ScrollBoxRenderable>(null);
+  useEffect(() => {
+    const row = panel.rows[panel.index];
+    if (row) listRef.current?.scrollChildIntoView(`effort-${row.id}`);
+  }, [panel.index, panel.rows]);
+  const visible = Math.min(panel.rows.length, 20);
+  return (
+    <box paddingLeft={3} paddingRight={2} marginTop={1} flexShrink={0} flexDirection="column">
+      <text>
+        <b>Thinking effort</b>
+      </text>
+      <box marginTop={1} height={visible}>
+        <scrollbox ref={listRef} flexGrow={1} minHeight={0}>
+          {panel.rows.map((row, i) => {
+            const isCursor = i === panel.index;
+            return (
+              <box key={row.id} id={`effort-${row.id}`} flexDirection="column">
+                <text>
+                  <span style={{ fg: isCursor ? "#22c55e" : t.textMuted }}>{isCursor ? "> " : "  "}</span>
+                  <span style={{ fg: isCursor ? t.text : t.textMuted }}>
+                    {isCursor ? <b>{row.label}</b> : row.label}
+                  </span>
+                </text>
+              </box>
+            );
+          })}
+        </scrollbox>
+      </box>
+      <text fg={t.textDim}>{"↑↓ select · enter save · esc close"}</text>
     </box>
   );
 }

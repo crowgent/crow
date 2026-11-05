@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import type { SharedV3ProviderOptions } from "@ai-sdk/provider";
 import { generateText } from "ai";
+import { getReasoningEffortForModel } from "../utils/settings";
 import { getModelInfo, normalizeModelId, type ProviderModelInfo } from "./models";
 
 export type CrowProvider = ReturnType<typeof createOpenAI>;
@@ -112,11 +113,12 @@ async function consumeReasoningStream(
 export function resolveModelRuntime(provider: CrowProvider, requestedModelId: string): ResolvedModelRuntime {
   const modelId = normalizeModelId(requestedModelId);
   const modelInfo = getModelInfo(modelId);
+  const effort = getReasoningEffortForModel(modelId);
   return {
     model: provider.chat(modelId),
     modelId,
     modelInfo,
-    providerOptions: undefined,
+    providerOptions: effort ? { openai: { reasoningEffort: effort } } : undefined,
   };
 }
 

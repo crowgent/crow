@@ -43,7 +43,12 @@ import type {
   UsageSource,
 } from "../types/index";
 import { loadAgentDefinitions } from "../utils/agent-files";
-import { type CustomSubagentConfig, loadMcpServers, loadValidSubAgents } from "../utils/settings";
+import {
+  type CustomSubagentConfig,
+  getReasoningEffortForModel,
+  loadMcpServers,
+  loadValidSubAgents,
+} from "../utils/settings";
 import type { ProcessMessageObserver } from "./agent";
 import {
   accumulateUsage,
@@ -279,7 +284,7 @@ async function* processMessageBatchTurn(
                   messages: [...ctx.messages, ...turnMessages],
                   temperature: 0.7,
                   maxOutputTokens: runtime.modelInfo?.supportsMaxOutputTokens === false ? undefined : ctx.maxTokens,
-                  reasoningEffort: undefined,
+                  reasoningEffort: getReasoningEffortForModel(runtime.modelId),
                   tools: batchTools,
                 }),
               },
