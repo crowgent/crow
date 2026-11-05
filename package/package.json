@@ -13,9 +13,9 @@
   "license": "MIT",
   "name": "@crowgentai/crow",
   "optionalDependencies": {
-    "@crowgentai/crow-darwin-arm64": "1.1.43",
-    "@crowgentai/crow-linux-x64": "1.1.43",
-    "@crowgentai/crow-windows-x64": "1.1.43"
+    "@crowgentai/crow-darwin-arm64": "1.1.44",
+    "@crowgentai/crow-linux-x64": "1.1.44",
+    "@crowgentai/crow-windows-x64": "1.1.44"
   },
   "publishConfig": {
     "access": "public"
@@ -26,5 +26,5 @@
     "url": "https://github.com/crowgent/crow.git"
   },
   "type": "commonjs",
-  "version": "1.1.43"
+  "version": "1.1.44"
 }
